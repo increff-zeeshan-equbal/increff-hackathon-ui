@@ -20,6 +20,9 @@ import AddIcon from '@mui/icons-material/Add';
 import Chip from '@mui/material/Chip';
 import { styled } from '@mui/material/styles';
 import Avatar from '@mui/material/Avatar';
+import Grid from '@mui/material/Grid';
+import DiagnosticsIcon from '@mui/icons-material/FindInPage';
+import Button from '@mui/material/Button';
 
 const drawerWidth = 340;
 
@@ -160,6 +163,82 @@ const PromptChip = styled(Chip)(({ theme }) => ({
   height: 'auto',
 }));
 
+const StatusBox = styled(Paper, { 
+  shouldForwardProp: (prop) => prop !== 'status' 
+})<{ status?: 'success' | 'failure' | 'inactive' }>(({ theme, status }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '150px',
+  width: '200px',
+  padding: theme.spacing(2),
+  margin: theme.spacing(2),
+  borderRadius: theme.spacing(2),
+  boxShadow: status === 'success' 
+    ? `0 0 15px rgba(46, 204, 113, 0.5), inset 0 0 20px rgba(46, 204, 113, 0.3)` 
+    : status === 'failure'
+      ? `0 0 15px rgba(231, 76, 60, 0.5), inset 0 0 20px rgba(231, 76, 60, 0.3)`
+      : `0 0 15px rgba(149, 165, 166, 0.5), inset 0 0 20px rgba(149, 165, 166, 0.3)`,
+  background: status === 'success' 
+    ? 'rgba(46, 204, 113, 0.15)' 
+    : status === 'failure'
+      ? 'rgba(231, 76, 60, 0.15)'
+      : 'rgba(149, 165, 166, 0.15)',
+  border: `1px solid ${
+    status === 'success' 
+      ? 'rgba(46, 204, 113, 0.5)' 
+      : status === 'failure'
+        ? 'rgba(231, 76, 60, 0.5)'
+        : 'rgba(149, 165, 166, 0.5)'
+  }`,
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    transform: 'translateY(-5px)',
+    boxShadow: status === 'success' 
+      ? `0 5px 20px rgba(46, 204, 113, 0.6), inset 0 0 20px rgba(46, 204, 113, 0.4)` 
+      : status === 'failure'
+        ? `0 5px 20px rgba(231, 76, 60, 0.6), inset 0 0 20px rgba(231, 76, 60, 0.4)`
+        : `0 5px 20px rgba(149, 165, 166, 0.6), inset 0 0 20px rgba(149, 165, 166, 0.4)`,
+  }
+}));
+
+const DiagnosticsContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+  maxWidth: '900px',
+  width: '100%',
+  position: 'relative',
+}));
+
+const DiagnosticsRow = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  width: '100%',
+  position: 'relative',
+}));
+
+const ConnectorLine = styled('div')(({ theme }) => ({
+  position: 'absolute',
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  zIndex: 0,
+}));
+
+const HorizontalConnector = styled(ConnectorLine)(({ theme }) => ({
+  height: '3px',
+  width: '20px',
+}));
+
+const VerticalConnector = styled(ConnectorLine)(({ theme }) => ({
+  width: '3px',
+  height: '40px',
+  left: '50%',
+  transform: 'translateX(-50%)',
+}));
+
 // Custom hook for typing effect
 function useTypingEffect(text: string, speed: number = 50) {
   const [displayedText, setDisplayedText] = useState('');
@@ -200,10 +279,60 @@ const BlinkingCursor = styled('span')(({ theme }) => ({
   },
 }));
 
+// Add interface for API response
+interface ApiCallLog {
+  _id: string;
+  _index?: string;
+  component: string;
+  application: string;
+  module?: string;
+  http_status: string;
+  status: string;
+  url: string;
+  http_method?: string;
+  duration_millis?: number;
+  request_name?: string;
+  end_timestamp?: string;
+  requestBody?: string;
+  responseBody?: string;
+  http_headers?: string;
+  client?: string;
+  host?: string;
+  timestamp?: string;
+  // Add other fields as needed
+}
+
+interface TraceResponse {
+  trace_id: string;
+  count: number;
+  summary: {
+    oms_count: number;
+    cims_count: number;
+    wms_count: number;
+  };
+  latestFailureCall?: ApiCallLog;
+  oms: ApiCallLog[];
+  cims: ApiCallLog[];
+  wms: ApiCallLog[];
+}
+
+interface SystemStatus {
+  name: string;
+  status: 'success' | 'failure' | 'inactive';
+  callCount: number;
+}
+
 export default function HomePage() {
   const [message, setMessage] = useState('');
   const [conversation, setConversation] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState('chat');
   const hasConversation = conversation.length > 0;
+  
+  // Add state for diagnostics
+  const [traceId, setTraceId] = useState('');
+  const [systemsData, setSystemsData] = useState<SystemStatus[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Use the typing effect hook
   const { displayedText, isTyping } = useTypingEffect('Hi, Avishek Chatterjee', 70);
@@ -217,6 +346,51 @@ export default function HomePage() {
     "Troubleshoot payment issues",
     "Setup multi-location inventory"
   ];
+
+  // Process API response and determine component statuses
+  const processApiResponse = (data: TraceResponse): SystemStatus[] => {
+    // Define all systems we want to display
+    const systemNames = ['OMS', 'CIMS', 'WMS', 'Proxy', 'RMS', 'Channel'];
+    
+    // Create initial system data with inactive status
+    const systemStatuses: SystemStatus[] = systemNames.map(name => ({
+      name,
+      status: 'inactive',
+      callCount: 0
+    }));
+    
+    // Update status for OMS
+    const omsSystem = systemStatuses.find(s => s.name === 'OMS');
+    if (omsSystem) {
+      omsSystem.callCount = data.oms.length;
+      omsSystem.status = omsSystem.callCount > 0 ? 'success' : 'inactive';
+    }
+    
+    // Update status for CIMS
+    const cimsSystem = systemStatuses.find(s => s.name === 'CIMS');
+    if (cimsSystem) {
+      cimsSystem.callCount = data.cims.length;
+      cimsSystem.status = cimsSystem.callCount > 0 ? 'success' : 'inactive';
+    }
+    
+    // Update status for WMS
+    const wmsSystem = systemStatuses.find(s => s.name === 'WMS');
+    if (wmsSystem) {
+      wmsSystem.callCount = data.wms.length;
+      wmsSystem.status = wmsSystem.callCount > 0 ? 'success' : 'inactive';
+    }
+    
+    // If there's a failure, mark that system as failed
+    if (data.latestFailureCall) {
+      const failedComponentName = data.latestFailureCall.component.toUpperCase();
+      const failedSystem = systemStatuses.find(s => s.name === failedComponentName);
+      if (failedSystem) {
+        failedSystem.status = 'failure';
+      }
+    }
+    
+    return systemStatuses;
+  };
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -240,6 +414,86 @@ export default function HomePage() {
     // setTimeout(() => handleSendMessage(), 100);
   };
 
+  const handleTabClick = (tabName: string) => {
+    setActiveTab(tabName);
+  };
+
+  // Function to handle trace ID submission
+  const handleTraceIdSubmit = async () => {
+    if (traceId.trim()) {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // In a real implementation, we would make an API call here
+        // For now, simulate the API call with a timeout
+        setTimeout(() => {
+          // Mock API call - this would be replaced with an actual fetch call
+          // Example: const response = await fetch('/api/trace/' + traceId);
+          //          const data = await response.json();
+          
+          // For demonstration, we'll use the example data provided
+          const exampleResponse: TraceResponse = {
+            trace_id: "917df85e-e3ee-4481-8d4c-ea9b258c1f65",
+            count: 39,
+            summary: {
+              oms_count: 39,
+              cims_count: 0,
+              wms_count: 0
+            },
+            latestFailureCall: {
+              _id: "zQRUbpYB3rARF5bqxB4g",
+              _index: "oms-inbound-2025-04-25",
+              component: "oms",
+              application: "oms-inbound",
+              module: "ORDER_MANAGEMENT_SYSTEM",
+              client: "1200061523",
+              host: "staging-styli-omni",
+              timestamp: "2025-04-25T19:02:49.892",
+              url: "http://localhost:8080/oms/orders/outward/sub-orders/452?sync=false",
+              http_method: "GET",
+              http_status: "500",
+              status: "FAILURE",
+              duration_millis: 1084,
+              request_name: "GET_SUB_ORDER",
+              end_timestamp: "2025-04-25T19:02:50.976",
+              requestBody: "",
+              responseBody: "{\"code\":\"UNKNOWN_ERROR\",\"message\":\"Internal Error in OMS\",\"description\":null,\"errors\":[]}",
+              http_headers: ""
+            },
+            oms: Array(39).fill({
+              _id: "sample-id",
+              component: "oms",
+              application: "oms-application",
+              http_status: "200",
+              status: "SUCCESS",
+              url: "http://example.com"
+            }),
+            cims: [],
+            wms: []
+          };
+          
+          // Process the response
+          const processedSystems = processApiResponse(exampleResponse);
+          setSystemsData(processedSystems);
+          setIsLoading(false);
+        }, 1500);
+      } catch (err) {
+        console.error("Error fetching trace data:", err);
+        setError("Failed to fetch trace data. Please try again.");
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Handle trace ID key press
+  const handleTraceIdKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTraceIdSubmit();
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%)' }}>
       {/* Sidebar */}
@@ -254,20 +508,28 @@ export default function HomePage() {
         </Box>
         <Divider sx={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }} />
         <List sx={{ px: 1, flexGrow: 1 }}>
-          {['Recent Chats', 'Saved Conversations', 'Settings'].map((text, index) => (
-            <ListItem key={text} disablePadding>
-              <ListItemButton sx={{ 
-                borderRadius: 2, 
-                my: 0.5,
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                },
-                transition: 'background-color 0.2s ease'
-              }}>
+          {[
+            { text: 'Recent Chats', icon: <ChatIcon />, id: 'chat' },
+            { text: 'API Diagnostics', icon: <DiagnosticsIcon />, id: 'diagnostics' },
+            { text: 'Settings', icon: <SettingsIcon />, id: 'settings' }
+          ].map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton 
+                sx={{ 
+                  borderRadius: 2, 
+                  my: 0.5,
+                  backgroundColor: activeTab === item.id ? 'rgba(156, 39, 176, 0.15)' : 'transparent',
+                  '&:hover': {
+                    backgroundColor: activeTab === item.id ? 'rgba(156, 39, 176, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                  },
+                  transition: 'background-color 0.2s ease'
+                }}
+                onClick={() => handleTabClick(item.id)}
+              >
                 <ListItemIcon sx={{ color: 'white', minWidth: 40 }}>
-                  {index === 0 ? <ChatIcon /> : index === 1 ? <HistoryIcon /> : <SettingsIcon />}
+                  {item.icon}
                 </ListItemIcon>
-                <ListItemText primary={text} />
+                <ListItemText primary={item.text} />
               </ListItemButton>
             </ListItem>
           ))}
@@ -287,122 +549,431 @@ export default function HomePage() {
 
       {/* Main content */}
       <Main>
-        <ChatContainer hasConversation={hasConversation}>
-          {!hasConversation && (
-            <>
-              <WelcomeText variant="h3" component="h1" gutterBottom>
-                {displayedText}
-                {isTyping && <BlinkingCursor />}
-              </WelcomeText>
-              <Typography 
-                variant="subtitle1" 
-                color="text.secondary" 
-                sx={{ 
-                  opacity: isTyping ? 0 : 0.8, 
-                  mb: 2,
-                  transition: 'opacity 0.5s ease',
-                  transitionDelay: '0.3s'
-                }}
-              >
-                How can I help you today?
-              </Typography>
-              
-              {/* Default prompts - only show after typing is complete */}
-              <DefaultPromptsContainer sx={{ 
-                opacity: isTyping ? 0 : 1,
-                transition: 'opacity 0.5s ease',
-                transitionDelay: '0.5s'
-              }}>
-                {defaultPrompts.map((prompt, index) => (
-                  <PromptChip
-                    key={index}
-                    label={prompt}
-                    onClick={() => handlePromptClick(prompt)}
-                    clickable
-                    variant="outlined"
+        {activeTab === 'chat' && (
+          <>
+            <ChatContainer hasConversation={hasConversation}>
+              {!hasConversation && (
+                <>
+                  <WelcomeText variant="h3" gutterBottom>
+                    {displayedText}
+                    {isTyping && <BlinkingCursor />}
+                  </WelcomeText>
+                  <Typography 
+                    variant="subtitle1" 
+                    color="text.secondary" 
                     sx={{ 
-                      '& .MuiChip-label': { 
-                        px: 2,
-                        py: 0.8,
-                        fontSize: '0.9rem'
+                      opacity: isTyping ? 0 : 0.8, 
+                      mb: 2,
+                      transition: 'opacity 0.5s ease',
+                      transitionDelay: '0.3s'
+                    }}
+                  >
+                    How can I help you today?
+                  </Typography>
+                  
+                  {/* Default prompts - only show after typing is complete */}
+                  <DefaultPromptsContainer sx={{ 
+                    opacity: isTyping ? 0 : 1,
+                    transition: 'opacity 0.5s ease',
+                    transitionDelay: '0.5s'
+                  }}>
+                    {defaultPrompts.map((prompt, index) => (
+                      <PromptChip
+                        key={index}
+                        label={prompt}
+                        onClick={() => handlePromptClick(prompt)}
+                        clickable
+                        variant="outlined"
+                        sx={{ 
+                          '& .MuiChip-label': { 
+                            px: 2,
+                            py: 0.8,
+                            fontSize: '0.9rem'
+                          }
+                        }}
+                      />
+                    ))}
+                  </DefaultPromptsContainer>
+                </>
+              )}
+
+              {hasConversation && (
+                <Box sx={{ width: '100%', maxWidth: '800px', mb: 4, pb: 10 }}>
+                  {conversation.map((msg, index) => (
+                    <Box key={index} sx={{ mb: 2, p: 2, borderRadius: 2, background: 'rgba(255, 255, 255, 0.05)' }}>
+                      <Typography>{msg}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </ChatContainer>
+
+            <ChatInputContainer elevation={0}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  maxRows={4}
+                  placeholder="Message..."
+                  variant="outlined"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: 'rgba(30, 30, 40, 0.6)',
+                      borderRadius: 24,
+                      '&.Mui-focused': {
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(156, 39, 176, 0.5)',
+                          borderWidth: 1,
+                        },
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      color: '#f5f5f5',
+                    },
+                    margin: 0,
+                  }}
+                  InputProps={{
+                    sx: { py: 1.5, borderRadius: 24 }
+                  }}
+                />
+                <IconButton 
+                  color="primary" 
+                  sx={{ 
+                    ml: 1,
+                    bgcolor: 'rgba(156, 39, 176, 0.1)',
+                    '&:hover': {
+                      bgcolor: 'rgba(156, 39, 176, 0.2)',
+                    },
+                    '&.Mui-disabled': {
+                      opacity: 0.3,
+                    },
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                  }} 
+                  onClick={handleSendMessage}
+                  disabled={!message.trim()}
+                >
+                  <SendIcon />
+                </IconButton>
+              </Box>
+            </ChatInputContainer>
+          </>
+        )}
+
+        {activeTab === 'diagnostics' && (
+          <Box sx={{ 
+            width: '100%', 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            p: 2,
+            position: 'relative'
+          }}>
+            <Typography variant="h4" sx={{ 
+              mb: 6, 
+              mt: 2,
+              color: '#fff',
+              background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontWeight: 600
+            }}>
+              API Diagnostics
+            </Typography>
+            
+            {!systemsData ? (
+              <Box sx={{ 
+                width: '100%',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center'
+              }}>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 4, fontSize: '1.1rem' }}>
+                  Enter a trace ID to view API call flow and diagnostics
+                </Typography>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  width: '100%', 
+                  maxWidth: 550,
+                  gap: 1.5
+                }}>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder="Enter Trace ID"
+                    value={traceId}
+                    onChange={(e) => setTraceId(e.target.value)}
+                    onKeyDown={handleTraceIdKeyPress}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: 'rgba(30, 30, 40, 0.6)',
+                        borderRadius: 2.5,
+                        height: 56,
+                        '&.Mui-focused': {
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(156, 39, 176, 0.5)',
+                            borderWidth: 1,
+                          },
+                        },
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(255, 255, 255, 0.1)',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(255, 255, 255, 0.2)',
+                        },
+                      },
+                      '& .MuiInputBase-input': {
+                        color: '#f5f5f5',
+                        fontSize: '1.1rem',
+                        padding: '14px 16px'
                       }
                     }}
                   />
-                ))}
-              </DefaultPromptsContainer>
-            </>
-          )}
-
-          {hasConversation && (
-            <Box sx={{ width: '100%', maxWidth: '800px', mb: 4, pb: 10 }}>
-              {conversation.map((msg, index) => (
-                <Box key={index} sx={{ mb: 2, p: 2, borderRadius: 2, background: 'rgba(255, 255, 255, 0.05)' }}>
-                  <Typography>{msg}</Typography>
+                  <IconButton 
+                    color="primary" 
+                    sx={{ 
+                      bgcolor: 'rgba(156, 39, 176, 0.1)',
+                      '&:hover': {
+                        bgcolor: 'rgba(156, 39, 176, 0.2)',
+                      },
+                      '&.Mui-disabled': {
+                        opacity: 0.3,
+                      },
+                      width: 56,
+                      height: 56,
+                      borderRadius: 2.5,
+                    }} 
+                    onClick={handleTraceIdSubmit}
+                    disabled={!traceId.trim() || isLoading}
+                  >
+                    {isLoading ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 }}>
+                        <Typography sx={{ fontSize: 28, animation: 'spin 2s linear infinite', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }}>
+                          ⌛
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <SendIcon sx={{ fontSize: 26 }} />
+                    )}
+                  </IconButton>
                 </Box>
-              ))}
-            </Box>
-          )}
-        </ChatContainer>
-
-        <ChatInputContainer elevation={0}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <TextField
-              fullWidth
-              multiline
-              maxRows={4}
-              placeholder="Message..."
-              variant="outlined"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
-              sx={{ 
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'rgba(30, 30, 40, 0.6)',
-                  borderRadius: 24,
-                  '&.Mui-focused': {
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(156, 39, 176, 0.5)',
-                      borderWidth: 1,
-                    },
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#f5f5f5',
-                },
-                margin: 0,
-              }}
-              InputProps={{
-                sx: { py: 1.5, borderRadius: 24 }
-              }}
-            />
-            <IconButton 
-              color="primary" 
-              sx={{ 
-                ml: 1,
-                bgcolor: 'rgba(156, 39, 176, 0.1)',
-                '&:hover': {
-                  bgcolor: 'rgba(156, 39, 176, 0.2)',
-                },
-                '&.Mui-disabled': {
-                  opacity: 0.3,
-                },
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-              }} 
-              onClick={handleSendMessage}
-              disabled={!message.trim()}
-            >
-              <SendIcon />
-            </IconButton>
+                
+                {error && (
+                  <Typography 
+                    color="error" 
+                    sx={{ 
+                      mt: 3, 
+                      p: 1.5, 
+                      borderRadius: 1, 
+                      background: 'rgba(231, 76, 60, 0.1)',
+                      border: '1px solid rgba(231, 76, 60, 0.3)',
+                      maxWidth: 550
+                    }}
+                  >
+                    {error}
+                  </Typography>
+                )}
+              </Box>
+            ) : (
+              <Box sx={{ width: '100%', maxWidth: '1000px' }}>
+                {/* API Call Summary */}
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    mb: 4, 
+                    p: 2, 
+                    borderRadius: 2, 
+                    background: 'rgba(255, 255, 255, 0.05)'
+                  }}
+                >
+                  <Typography variant="subtitle1" color="text.secondary">
+                    Trace ID: <Typography component="span" sx={{ color: 'primary.main' }}>{traceId}</Typography>
+                  </Typography>
+                  
+                  <Box>
+                    <Chip 
+                      label={`OMS: ${systemsData.find(s => s.name === 'OMS')?.callCount || 0} calls`} 
+                      sx={{ 
+                        mx: 0.5, 
+                        background: systemsData.find(s => s.name === 'OMS')?.status === 'failure' 
+                          ? 'rgba(231, 76, 60, 0.2)' 
+                          : 'rgba(255, 255, 255, 0.1)'
+                      }} 
+                    />
+                    <Chip 
+                      label={`CIMS: ${systemsData.find(s => s.name === 'CIMS')?.callCount || 0} calls`} 
+                      sx={{ 
+                        mx: 0.5, 
+                        background: systemsData.find(s => s.name === 'CIMS')?.status === 'failure' 
+                          ? 'rgba(231, 76, 60, 0.2)' 
+                          : 'rgba(255, 255, 255, 0.1)'
+                      }} 
+                    />
+                    <Chip 
+                      label={`WMS: ${systemsData.find(s => s.name === 'WMS')?.callCount || 0} calls`} 
+                      sx={{ 
+                        mx: 0.5, 
+                        background: systemsData.find(s => s.name === 'WMS')?.status === 'failure' 
+                          ? 'rgba(231, 76, 60, 0.2)' 
+                          : 'rgba(255, 255, 255, 0.1)'
+                      }} 
+                    />
+                  </Box>
+                  
+                  <Button 
+                    size="small" 
+                    variant="outlined" 
+                    onClick={() => setSystemsData(null)}
+                    sx={{ 
+                      ml: 2, 
+                      borderColor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'text.secondary'
+                    }}
+                  >
+                    New Search
+                  </Button>
+                </Box>
+                
+                <DiagnosticsContainer>
+                  <DiagnosticsRow sx={{ position: 'relative' }}>
+                    {['WMS', 'OMS', 'CIMS', 'Proxy', 'RMS'].map((name, index) => {
+                      const system = systemsData.find(s => s.name === name);
+                      if (!system) return null;
+                      
+                      const isProxy = name === 'Proxy';
+                      
+                      return (
+                        <Box 
+                          key={name} 
+                          sx={{ position: 'relative', zIndex: 1 }} 
+                          id={isProxy ? 'proxy-component' : undefined}
+                        >
+                          <StatusBox status={system.status}>
+                            <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
+                              {system.name}
+                            </Typography>
+                            <Typography variant="body1" sx={{ 
+                              color: 
+                                system.status === 'success' ? 'rgb(46, 204, 113)' : 
+                                system.status === 'failure' ? 'rgb(231, 76, 60)' : 
+                                'rgb(149, 165, 166)',
+                              fontWeight: 'bold'
+                            }}>
+                              {system.status === 'success' ? 'Success' : 
+                               system.status === 'failure' ? 'Failed' : 
+                               'No Calls'}
+                            </Typography>
+                            {system.callCount > 0 && (
+                              <Chip 
+                                label={`${system.callCount} calls`} 
+                                size="small" 
+                                sx={{ 
+                                  mt: 1, 
+                                  background: 'rgba(255, 255, 255, 0.1)', 
+                                  color: 'text.secondary',
+                                  fontSize: '0.7rem'
+                                }} 
+                              />
+                            )}
+                          </StatusBox>
+                          
+                          {index < 4 && (
+                            <HorizontalConnector 
+                              sx={{ 
+                                position: 'absolute', 
+                                top: '75px', 
+                                right: '-20px',
+                              }}
+                            />
+                          )}
+                          
+                          {/* Add vertical connector from Proxy */}
+                          {isProxy && (
+                            <Box 
+                              sx={{ 
+                                position: 'absolute',
+                                top: '150px',
+                                left: '100px',
+                                width: '3px',
+                                height: '50px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                                zIndex: 0
+                              }}
+                            />
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </DiagnosticsRow>
+                  
+                  {/* Position Channel directly under Proxy */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    position: 'relative', 
+                    mt: '0px', 
+                    ml: '402px', /* Adjusted to align with Proxy */
+                    zIndex: 1
+                  }}>
+                    <StatusBox status={systemsData.find(s => s.name === 'Channel')?.status || 'inactive'}>
+                      <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
+                        Channel
+                      </Typography>
+                      <Typography variant="body1" sx={{ 
+                        color: 
+                          systemsData.find(s => s.name === 'Channel')?.status === 'success' ? 'rgb(46, 204, 113)' : 
+                          systemsData.find(s => s.name === 'Channel')?.status === 'failure' ? 'rgb(231, 76, 60)' : 
+                          'rgb(149, 165, 166)',
+                        fontWeight: 'bold'
+                      }}>
+                        {systemsData.find(s => s.name === 'Channel')?.status === 'success' ? 'Success' : 
+                         systemsData.find(s => s.name === 'Channel')?.status === 'failure' ? 'Failed' : 
+                         'No Calls'}
+                      </Typography>
+                      {(systemsData.find(s => s.name === 'Channel')?.callCount || 0) > 0 && (
+                        <Chip 
+                          label={`${systemsData.find(s => s.name === 'Channel')?.callCount || 0} calls`} 
+                          size="small" 
+                          sx={{ 
+                            mt: 1, 
+                            background: 'rgba(255, 255, 255, 0.1)', 
+                            color: 'text.secondary',
+                            fontSize: '0.7rem'
+                          }} 
+                        />
+                      )}
+                    </StatusBox>
+                  </Box>
+                </DiagnosticsContainer>
+              </Box>
+            )}
           </Box>
-        </ChatInputContainer>
+        )}
+
+        {activeTab === 'settings' && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Typography variant="h5" color="text.secondary">Settings Panel</Typography>
+          </Box>
+        )}
       </Main>
     </Box>
   );
