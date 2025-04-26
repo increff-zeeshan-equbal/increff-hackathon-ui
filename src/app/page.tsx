@@ -213,6 +213,34 @@ const DiagnosticsContainer = styled(Box)(({ theme }) => ({
   position: 'relative',
 }));
 
+// Styled component for API logs list
+const ApiLogsList = styled(Paper)(({ theme }) => ({
+  width: '100%',
+  maxWidth: '900px',
+  marginTop: theme.spacing(4),
+  backgroundColor: 'rgba(30, 30, 40, 0.6)',
+  borderRadius: theme.spacing(1),
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+  padding: theme.spacing(2),
+  overflowY: 'auto',
+  maxHeight: '600px',
+  transition: 'max-width 0.3s ease',
+}));
+
+// Styled component for API log details
+const ApiLogDetails = styled(Paper)(({ theme }) => ({
+  width: '100%',
+  maxWidth: '530px',
+  marginTop: theme.spacing(4),
+  marginLeft: theme.spacing(2),
+  backgroundColor: 'rgba(30, 30, 40, 0.6)',
+  borderRadius: theme.spacing(1),
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+  padding: theme.spacing(2),
+  overflowY: 'auto',
+  maxHeight: '600px',
+}));
+
 const DiagnosticsRow = styled(Box)(({ theme }) => ({
   display: 'flex',
   justifyContent: 'center',
@@ -334,6 +362,11 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Add state for API logs
+  const [apiLogs, setApiLogs] = useState<Record<string, ApiCallLog[]>>({});
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<ApiCallLog | null>(null);
+  
   // Use the typing effect hook
   const { displayedText, isTyping } = useTypingEffect('Hi, Avishek Chatterjee', 70);
 
@@ -388,6 +421,13 @@ export default function HomePage() {
         failedSystem.status = 'failure';
       }
     }
+
+    // Store the API logs
+    setApiLogs({
+      OMS: data.oms,
+      CIMS: data.cims,
+      WMS: data.wms
+    });
     
     return systemStatuses;
   };
@@ -416,6 +456,60 @@ export default function HomePage() {
 
   const handleTabClick = (tabName: string) => {
     setActiveTab(tabName);
+  };
+
+  // Handle component click to show logs
+  const handleComponentClick = (componentName: string) => {
+    const logs = apiLogs[componentName];
+    if (logs && logs.length > 0) {
+      setSelectedComponent(componentName);
+      setSelectedLog(null);
+    }
+  };
+
+  // Handle log click to show details
+  const handleLogClick = (log: ApiCallLog) => {
+    setSelectedLog(log);
+  };
+
+  // Update the StatusBox component to be clickable when it has logs
+  const renderStatusBox = (system: SystemStatus) => {
+    const hasLogs = system.callCount > 0;
+    
+    return (
+      <StatusBox 
+        status={system.status} 
+        onClick={() => hasLogs && handleComponentClick(system.name)}
+        sx={{ cursor: hasLogs ? 'pointer' : 'default' }}
+      >
+        <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
+          {system.name}
+        </Typography>
+        <Typography variant="body1" sx={{ 
+          color: 
+            system.status === 'success' ? 'rgb(46, 204, 113)' : 
+            system.status === 'failure' ? 'rgb(231, 76, 60)' : 
+            'rgb(149, 165, 166)',
+          fontWeight: 'bold'
+        }}>
+          {system.status === 'success' ? 'Success' : 
+           system.status === 'failure' ? 'Failed' : 
+           'No Calls'}
+        </Typography>
+        {system.callCount > 0 && (
+          <Chip 
+            label={`${system.callCount} calls`} 
+            size="small" 
+            sx={{ 
+              mt: 1, 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              color: 'text.secondary',
+              fontSize: '0.7rem'
+            }} 
+          />
+        )}
+      </StatusBox>
+    );
   };
 
   // Function to handle trace ID submission
@@ -834,34 +928,7 @@ export default function HomePage() {
                           sx={{ position: 'relative', zIndex: 1 }} 
                           id={isProxy ? 'proxy-component' : undefined}
                         >
-                          <StatusBox status={system.status}>
-                            <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
-                              {system.name}
-                            </Typography>
-                            <Typography variant="body1" sx={{ 
-                              color: 
-                                system.status === 'success' ? 'rgb(46, 204, 113)' : 
-                                system.status === 'failure' ? 'rgb(231, 76, 60)' : 
-                                'rgb(149, 165, 166)',
-                              fontWeight: 'bold'
-                            }}>
-                              {system.status === 'success' ? 'Success' : 
-                               system.status === 'failure' ? 'Failed' : 
-                               'No Calls'}
-                            </Typography>
-                            {system.callCount > 0 && (
-                              <Chip 
-                                label={`${system.callCount} calls`} 
-                                size="small" 
-                                sx={{ 
-                                  mt: 1, 
-                                  background: 'rgba(255, 255, 255, 0.1)', 
-                                  color: 'text.secondary',
-                                  fontSize: '0.7rem'
-                                }} 
-                              />
-                            )}
-                          </StatusBox>
+                          {renderStatusBox(system)}
                           
                           {index < 4 && (
                             <HorizontalConnector 
@@ -901,35 +968,168 @@ export default function HomePage() {
                     ml: '402px', /* Adjusted to align with Proxy */
                     zIndex: 1
                   }}>
-                    <StatusBox status={systemsData.find(s => s.name === 'Channel')?.status || 'inactive'}>
-                      <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
-                        Channel
-                      </Typography>
-                      <Typography variant="body1" sx={{ 
-                        color: 
-                          systemsData.find(s => s.name === 'Channel')?.status === 'success' ? 'rgb(46, 204, 113)' : 
-                          systemsData.find(s => s.name === 'Channel')?.status === 'failure' ? 'rgb(231, 76, 60)' : 
-                          'rgb(149, 165, 166)',
-                        fontWeight: 'bold'
-                      }}>
-                        {systemsData.find(s => s.name === 'Channel')?.status === 'success' ? 'Success' : 
-                         systemsData.find(s => s.name === 'Channel')?.status === 'failure' ? 'Failed' : 
-                         'No Calls'}
-                      </Typography>
-                      {(systemsData.find(s => s.name === 'Channel')?.callCount || 0) > 0 && (
-                        <Chip 
-                          label={`${systemsData.find(s => s.name === 'Channel')?.callCount || 0} calls`} 
-                          size="small" 
-                          sx={{ 
-                            mt: 1, 
-                            background: 'rgba(255, 255, 255, 0.1)', 
-                            color: 'text.secondary',
-                            fontSize: '0.7rem'
-                          }} 
-                        />
-                      )}
-                    </StatusBox>
+                    {renderStatusBox(systemsData.find(s => s.name === 'Channel') || { 
+                      name: 'Channel', 
+                      status: 'inactive', 
+                      callCount: 0 
+                    })}
                   </Box>
+
+                  {/* API Logs list and details side by side */}
+                  {selectedComponent && apiLogs[selectedComponent]?.length > 0 && (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'row',
+                      width: '100%',
+                      maxWidth: '900px',
+                      flexWrap: 'wrap',
+                      gap: { xs: 2, md: 0 } 
+                    }}>
+                      <ApiLogsList sx={{ maxWidth: selectedLog ? '350px' : '900px' }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>
+                          {selectedComponent} API Call Logs ({apiLogs[selectedComponent].length})
+                        </Typography>
+                        <List sx={{ maxHeight: 'calc(600px - 80px)', overflowY: 'auto' }}>
+                          {apiLogs[selectedComponent].map((log) => (
+                            <ListItem 
+                              key={log._id} 
+                              onClick={() => handleLogClick(log)} 
+                              sx={{ 
+                                cursor: 'pointer',
+                                borderLeft: `4px solid ${log.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}`,
+                                mb: 1,
+                                backgroundColor: selectedLog?._id === log._id ? 'rgba(156, 39, 176, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                                borderRadius: '0 4px 4px 0',
+                                '&:hover': {
+                                  backgroundColor: selectedLog?._id === log._id ? 'rgba(156, 39, 176, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                }
+                              }}
+                            >
+                              <ListItemText
+                                primary={
+                                  <Typography 
+                                    color={log.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}
+                                    sx={{ fontWeight: 'bold' }}
+                                  >
+                                    {log.request_name || log.url.split('/').pop() || 'API Call'}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <>
+                                    <Typography component="span" variant="body2" sx={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {log.http_method} {log.url}
+                                    </Typography>
+                                    <Typography component="span" variant="body2" sx={{ display: 'block' }}>
+                                      Status: {log.http_status} • {log.duration_millis}ms
+                                    </Typography>
+                                  </>
+                                }
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </ApiLogsList>
+
+                      {/* API Log Details */}
+                      {selectedLog && (
+                        <ApiLogDetails>
+                          <Typography variant="h6" sx={{ mb: 2 }}>API Call Details</Typography>
+                          
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                            <Box sx={{ flex: '1 1 45%', minWidth: '200px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">ID</Typography>
+                              <Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedLog._id}</Typography>
+                            </Box>
+                            <Box sx={{ flex: '1 1 45%', minWidth: '200px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                              <Typography 
+                                color={selectedLog.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}
+                                sx={{ fontWeight: 'bold' }}
+                              >
+                                {selectedLog.status} ({selectedLog.http_status})
+                              </Typography>
+                            </Box>
+                            <Box sx={{ flex: '1 1 100%' }}>
+                              <Typography variant="subtitle2" color="text.secondary">URL</Typography>
+                              <Typography sx={{ wordBreak: 'break-all' }}>{selectedLog.http_method} {selectedLog.url}</Typography>
+                            </Box>
+                            <Box sx={{ flex: '1 1 30%', minWidth: '150px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Request Name</Typography>
+                              <Typography>{selectedLog.request_name || 'N/A'}</Typography>
+                            </Box>
+                            <Box sx={{ flex: '1 1 30%', minWidth: '100px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Duration</Typography>
+                              <Typography>{selectedLog.duration_millis}ms</Typography>
+                            </Box>
+                            <Box sx={{ flex: '1 1 30%', minWidth: '150px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Timestamp</Typography>
+                              <Typography>{new Date(selectedLog.timestamp || '').toLocaleString()}</Typography>
+                            </Box>
+                            
+                            {selectedLog.requestBody && (
+                              <Box sx={{ flex: '1 1 100%' }}>
+                                <Typography variant="subtitle2" color="text.secondary">Request Body</Typography>
+                                <Paper 
+                                  sx={{ 
+                                    p: 1.5, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', 
+                                    maxHeight: '120px', 
+                                    overflow: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.85rem',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all'
+                                  }}
+                                >
+                                  {selectedLog.requestBody}
+                                </Paper>
+                              </Box>
+                            )}
+                            
+                            {selectedLog.responseBody && (
+                              <Box sx={{ flex: '1 1 100%' }}>
+                                <Typography variant="subtitle2" color="text.secondary">Response Body</Typography>
+                                <Paper 
+                                  sx={{ 
+                                    p: 1.5, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', 
+                                    maxHeight: '120px', 
+                                    overflow: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.85rem',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all'
+                                  }}
+                                >
+                                  {selectedLog.responseBody}
+                                </Paper>
+                              </Box>
+                            )}
+                            
+                            {selectedLog.http_headers && (
+                              <Box sx={{ flex: '1 1 100%' }}>
+                                <Typography variant="subtitle2" color="text.secondary">HTTP Headers</Typography>
+                                <Paper 
+                                  sx={{ 
+                                    p: 1.5, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', 
+                                    maxHeight: '120px', 
+                                    overflow: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.85rem',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all'
+                                  }}
+                                >
+                                  {selectedLog.http_headers}
+                                </Paper>
+                              </Box>
+                            )}
+                          </Box>
+                        </ApiLogDetails>
+                      )}
+                    </Box>
+                  )}
                 </DiagnosticsContainer>
               </Box>
             )}
