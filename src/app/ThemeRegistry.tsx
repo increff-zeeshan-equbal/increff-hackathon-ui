@@ -67,6 +67,33 @@ const theme = createTheme({
         },
       },
     },
+    MuiAutocomplete: {
+      styleOverrides: {
+        listbox: {
+          padding: '8px',
+          '& .MuiAutocomplete-option': {
+            borderRadius: 8,
+            margin: '4px 0',
+            '&:hover': {
+              backgroundColor: 'rgba(156, 39, 176, 0.08)',
+            },
+            '&.Mui-focused': {
+              backgroundColor: 'rgba(156, 39, 176, 0.12)',
+            },
+          },
+        },
+        paper: {
+          backgroundColor: 'rgba(255, 255, 255, 0.18)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          borderRadius: 12,
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+          border: '1px solid rgba(255, 255, 255, 0.18)',
+          margin: '8px 0',
+          minWidth: 300,
+        },
+      },
+    },
   },
 });
 
