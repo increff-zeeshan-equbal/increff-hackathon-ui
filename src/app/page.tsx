@@ -32,6 +32,31 @@ import AnalyticsIcon from '@mui/icons-material/Analytics';
 import CloseIcon from '@mui/icons-material/Close';
 import ArticleIcon from '@mui/icons-material/Article';
 import LinkIcon from '@mui/icons-material/Link';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardHeader from '@mui/material/CardHeader';
+import CircularProgress from '@mui/material/CircularProgress';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import Autocomplete from '@mui/material/Autocomplete';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import SupportIcon from '@mui/icons-material/Support';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import EditIcon from '@mui/icons-material/Edit';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import ApiDashboard from '../components/ApiDashboard';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer } from 'recharts';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const drawerWidth = 340;
 
@@ -39,12 +64,12 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme }) => ({
     flexGrow: 1,
     padding: theme.spacing(3),
-    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
     background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%)',
     position: 'relative',
     marginLeft: theme.spacing(2),
+    overflow: 'auto',
     '&::before': {
       content: '""',
       position: 'absolute',
@@ -172,15 +197,28 @@ const PromptChip = styled(Chip)(({ theme }) => ({
   height: 'auto',
 }));
 
-const StatusBox = styled(Paper, { 
-  shouldForwardProp: (prop) => prop !== 'status' 
-})<{ status?: 'success' | 'failure' | 'inactive' }>(({ theme, status }) => ({
+const StatusBox = styled(Box)<{ status: string }>(({ theme, status }) => ({
+  width: '100%',
+  minWidth: 180,
+  padding: theme.spacing(2.5),
+  borderRadius: theme.spacing(2),
+  background: 'rgba(18, 18, 30, 0.7)',
+  border: '1px solid',
+  borderColor:
+    status === 'success' ? 'rgba(46, 204, 113, 0.3)' :
+    status === 'failure' ? 'rgba(231, 76, 60, 0.3)' :
+    'rgba(255, 255, 255, 0.08)',
+  boxShadow:
+    status === 'success' ? '0 4px 12px rgba(46, 204, 113, 0.15)' :
+    status === 'failure' ? '0 4px 12px rgba(231, 76, 60, 0.15)' :
+    '0 4px 12px rgba(0, 0, 0, 0.1)',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
   height: '120px',
   width: '160px',
+  textAlign: 'center',
   padding: theme.spacing(1.5),
   margin: theme.spacing(1.5),
   borderRadius: theme.spacing(2),
@@ -203,13 +241,12 @@ const StatusBox = styled(Paper, {
   }`,
   transition: 'all 0.3s ease',
   '&:hover': {
-    transform: 'translateY(-5px)',
-    boxShadow: status === 'success' 
-      ? `0 5px 20px rgba(46, 204, 113, 0.6), inset 0 0 20px rgba(46, 204, 113, 0.4)` 
-      : status === 'failure'
-        ? `0 5px 20px rgba(231, 76, 60, 0.6), inset 0 0 20px rgba(231, 76, 60, 0.4)`
-        : `0 5px 20px rgba(149, 165, 166, 0.6), inset 0 0 20px rgba(149, 165, 166, 0.4)`,
-  }
+    transform: 'translateY(-4px)',
+    boxShadow:
+      status === 'success' ? '0 8px 24px rgba(46, 204, 113, 0.2)' :
+      status === 'failure' ? '0 8px 24px rgba(231, 76, 60, 0.2)' :
+      '0 8px 24px rgba(0, 0, 0, 0.15)',
+  },
 }));
 
 const DiagnosticsContainer = styled(Box)(({ theme }) => ({
@@ -372,47 +409,946 @@ interface SystemStatus {
   callCount: number;
 }
 
-interface JiraIssue {
-  issueKey: string;
-  summary: string;
-  description: string;
-  extractedRCA: string | null;
-  status: string;
-  issueType: string;
-  similarityScore: number;
+interface JiraIssueZee {
+    issueKey: string;
+    summary: string;
+    description: string;
+    extractedRCA: string | null;
+    status: string;
+    issueType: string;
+    similarityScore: number;
 }
 
 interface SearchResponse {
-  status: string;
-  code: number;
-  message: string;
-  data: {
-    query: string;
-    totalResults: number;
-    results: JiraIssue[];
-  };
+    status: string;
+    code: number;
+    message: string;
+    data: {
+        query: string;
+        totalResults: number;
+        results: JiraIssueZee[];
+    };
 }
 
 interface RcaResponse {
-  status: string;
-  code: number;
-  message: string;
-  data: {
-    query: string;
-    rca: string;
-    issuesUsed: {
-      issueKey: string;
-      summary: string;
-      similarityScore: number;
-    }[];
-    totalIssuesUsed: number;
+    status: string;
+    code: number;
+    message: string;
+    data: {
+        query: string;
+        rca: string;
+        issuesUsed: {
+            issueKey: string;
+            summary: string;
+            similarityScore: number;
+        }[];
+        totalIssuesUsed: number;
+    };
+}
+
+// --- New Jira RCA Analysis Component ---
+interface JiraUser {
+  displayName: string;
+  emailAddress?: string;
+  avatarUrls?: { [key: string]: string };
+}
+
+interface JiraIssue {
+  id: string;
+  key: string;
+  fields: {
+    summary: string;
+    description?: string;
+    status: { name: string };
+    assignee?: JiraUser;
+    reporter?: JiraUser;
+    priority?: { name: string };
   };
+}
+
+interface JiraResponse {
+  issues: JiraIssue[];
+}
+
+// Add new interface for issue summary
+interface IssueSummary {
+  summary: string;
+  rca?: string;
+}
+
+// Add this interface for Freshdesk tickets
+interface FreshdeskTicket {
+  id: number;
+  subject: string;
+  status: number;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+  due_by: string;
+  requester_id: number;
+  responder_id: number | null;
+  custom_fields: {
+    cf_client?: string;
+    cf_product_or_service?: string;
+    cf_rca?: string;
+    cf_corrective_action?: string;
+    cf_preventive_action?: string;
+    [key: string]: any;
+  };
+  tags: string[];
+  source: number;
+  company_id: number;
+}
+
+function JiraRcaAnalysis() {
+  const [loading, setLoading] = useState(false);
+  const [issues, setIssues] = useState<JiraIssue[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [autocompleteOptions, setAutocompleteOptions] = useState<{ summary: string; key: string }[]>([]);
+  const [autocompleteLoading, setAutocompleteLoading] = useState(false);
+
+  // Add new state for the detail dialog
+  const [selectedIssue, setSelectedIssue] = useState<JiraIssue | null>(null);
+  const [issueSummary, setIssueSummary] = useState<IssueSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
+  // Gradient text style
+  const gradientText = {
+    background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+    backgroundClip: 'text',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    fontWeight: 700,
+  };
+
+  // Fetch recent issues on mount or when not in search mode
+  useEffect(() => {
+    if (searchMode) return;
+    setLoading(true);
+    setError(null);
+    fetch('http://localhost:8080/api/jira/issues/recent?email=prakhar.singh@increff.com')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch Jira issues');
+        return res.json();
+      })
+      .then((data: JiraResponse) => {
+        setIssues(data.issues || []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError('Could not fetch Jira issues');
+        setLoading(false);
+      });
+  }, [searchMode]);
+
+  // Autocomplete handler
+  const handleAutocompleteInput = async (event: any, value: string) => {
+    setSearch(value);
+    if (!value.trim()) {
+      setAutocompleteOptions([]);
+      return;
+    }
+    setAutocompleteLoading(true);
+    try {
+      const res = await fetch(
+        `http://localhost:8080/api/jira/issues/autocomplete?query=${encodeURIComponent(value)}`
+      );
+      if (!res.ok) throw new Error('Failed to fetch autocomplete');
+      const data = await res.json();
+      setAutocompleteOptions(data || []);
+    } catch {
+      setAutocompleteOptions([]);
+    }
+    setAutocompleteLoading(false);
+  };
+
+  // Search handler (by key)
+  const handleSearch = async (selectedKey?: string) => {
+    const queryKey = selectedKey || search;
+    if (!queryKey.trim()) return;
+    setSearchLoading(true);
+    setSearchMode(true);
+    setError(null);
+
+    try {
+      // First, search for the issue to get results
+      const searchRes = await fetch(
+        `http://localhost:8080/api/jira/issues/search?email=prakhar.singh@increff.com&query=${encodeURIComponent(
+          queryKey
+        )}`
+      );
+
+      if (!searchRes.ok) throw new Error('Failed to search Jira issues');
+      const searchData: JiraResponse = await searchRes.json();
+      setIssues(searchData.issues || []);
+
+      // If we have results, get the first issue key and fetch its details
+      if (searchData.issues && searchData.issues.length > 0) {
+        const issueKey = searchData.issues[0].key;
+
+        // Fetch the specific issue details - same as clicking a card
+        const issueRes = await fetch(
+          `http://localhost:8080/api/jira/issues/${issueKey}`
+        );
+
+        if (!issueRes.ok) throw new Error('Failed to fetch issue details');
+        const issueData = await issueRes.json();
+
+        // Set the selected issue with full details
+        setSelectedIssue(issueData);
+        setIssueSummary(null); // Reset summary when opening a new issue
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Could not search Jira issues');
+    }
+
+    setSearchLoading(false);
+  };
+
+  // Allow Enter key to trigger search
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // Modify the autocomplete onChange handler
+  const handleAutocompleteChange = (_, value) => {
+    if (typeof value === 'string') {
+      setSearch(value);
+      handleSearch(value);
+    } else if (value && value.key) {
+      // If we have a specific issue key from autocomplete
+      setSearch(value.key);
+
+      // Directly fetch this specific issue
+      setSearchLoading(true);
+      fetch(`http://localhost:8080/api/jira/issues/${value.key}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch issue details');
+          return res.json();
+        })
+        .then(data => {
+          setSelectedIssue(data);
+          setIssueSummary(null);
+
+          // Also update the search results to include this issue
+          setIssues([data]);
+          setSearchMode(true);
+        })
+        .catch(err => {
+          console.error('Error fetching issue:', err);
+          setError('Could not fetch issue details');
+        })
+        .finally(() => {
+          setSearchLoading(false);
+        });
+    }
+  };
+
+  // Reset to recent tickets
+  const handleShowRecent = () => {
+    setSearch('');
+    setSearchMode(false);
+    setError(null);
+  };
+
+  // Add function to handle card click
+  const handleCardClick = (issue: JiraIssue) => {
+    setSelectedIssue(issue);
+    setIssueSummary(null); // Reset summary when opening a new issue
+  };
+
+  // Add function to close dialog
+  const handleCloseDialog = () => {
+    setSelectedIssue(null);
+    setIssueSummary(null);
+  };
+
+  // Add function to fetch issue summary
+  const handleSummarizeIssue = async () => {
+    if (!selectedIssue) return;
+
+    setSummaryLoading(true);
+    try {
+      const res = await fetch(
+        `http://localhost:8080/api/jira/issues/${selectedIssue.key}/summarize`
+      );
+      if (!res.ok) throw new Error('Failed to summarize issue');
+      const data: IssueSummary = await res.json();
+      setIssueSummary(data);
+    } catch (err) {
+      console.error('Error summarizing issue:', err);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  // Add function to handle copying text
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        // Optional: Show a success message
+        console.log('Text copied to clipboard');
+      })
+      .catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+  };
+
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        height: '100%',
+        overflow: 'auto',
+        px: 2,
+        py: 4,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Subheading and search bar */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          mb: 3,
+          flexWrap: 'wrap',
+          gap: 2,
+          width: '100%', // Ensure full width
+        }}
+      >
+        {/* Search box with autocomplete */}
+        <Box sx={{
+          flex: 1,
+          minWidth: 500, // Increased from 320px
+          maxWidth: '80%', // Added max width to ensure it doesn't get too wide
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <Autocomplete
+            freeSolo
+            loading={autocompleteLoading}
+            options={autocompleteOptions}
+            getOptionLabel={option =>
+              typeof option === 'string'
+                ? option
+                : `${option.key} - ${option.summary}`
+            }
+            filterOptions={x => x} // Show all options as is
+            inputValue={search}
+            onInputChange={handleAutocompleteInput}
+            onChange={handleAutocompleteChange}
+            renderOption={(props, option) => (
+              <li {...props} style={{ padding: '10px 16px' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Typography
+                    sx={{
+                      background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {typeof option === 'string' ? option : option.key}
+                  </Typography>
+                  {typeof option !== 'string' && (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {option.summary}
+                    </Typography>
+                  )}
+                </Box>
+              </li>
+            )}
+            renderInput={params => (
+              <TextField
+                {...params}
+                size="medium"
+                placeholder="Search by summary, key, assignee, etc."
+                onKeyDown={handleSearchKeyDown}
+                sx={{
+                  flex: 1,
+                  background: 'rgba(30, 30, 40, 0.6)',
+                  borderRadius: 2,
+                  width: '100%', // Ensure full width
+                  '& .MuiOutlinedInput-root': {
+                    color: '#fff',
+                    borderRadius: 2,
+                    fontWeight: 500,
+                    height: 56,
+                  },
+                  '& input': {
+                    color: '#fff',
+                    fontSize: '1.1rem',
+                    padding: '14px 16px',
+                  },
+                }}
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {autocompleteLoading ? (
+                        <CircularProgress color="inherit" size={18} />
+                      ) : null}
+                      {params.InputProps.endAdornment}
+                      <IconButton
+                        onClick={() => handleSearch()}
+                        disabled={searchLoading || !search.trim()}
+                        sx={{
+                          color: 'primary.main',
+                        }}
+                        size="small"
+                      >
+                        {searchLoading ? (
+                          <CircularProgress size={20} sx={{ color: 'primary.main' }} />
+                        ) : (
+                          <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+                            <path
+                              d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99a1 1 0 001.41-1.41l-4.99-5zm-6 0C8.01 14 6 11.99 6 9.5S8.01 5 10.5 5 15 7.01 15 9.5 12.99 14 10.5 14z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        )}
+                      </IconButton>
+                    </>
+                  ),
+                }}
+              />
+            )}
+            ListboxProps={{
+              style: {
+                margin: '8px 0',
+                padding: '8px',
+                background: 'rgba(18, 18, 30, 0.85)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                width: '100%', // Ensure full width
+                maxWidth: 'none', // Remove any max-width constraints
+              }
+            }}
+            PaperComponent={({ children }) => (
+              <Paper
+                elevation={6}
+                sx={{
+                  background: 'transparent',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  width: '100%', // Ensure full width
+                  maxWidth: 'none', // Remove any max-width constraints
+                }}
+              >
+                {children}
+              </Paper>
+            )}
+            sx={{
+              width: '100%', // Ensure the Autocomplete itself is full width
+            }}
+          />
+        </Box>
+
+        {/* Status indicator moved to right of search box */}
+        <Typography
+          variant="subtitle1"
+          sx={{
+            color: 'text.secondary',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            whiteSpace: 'nowrap',
+            ml: 'auto', // Push to the right
+          }}
+        >
+          {searchMode ? (
+            <>
+              Showing search results for{' '}
+              <Typography component="span" sx={gradientText}>
+                &quot;{search}&quot;
+              </Typography>
+              <Chip
+                label="Show Recent"
+                size="small"
+                onClick={handleShowRecent}
+                sx={{
+                  ml: 2,
+                  background: 'rgba(156,39,176,0.12)',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              />
+            </>
+          ) : (
+            <>
+              Showing{' '}<Typography component="span" sx={gradientText}>recent tickets</Typography>
+            </>
+          )}
+        </Typography>
+      </Box>
+
+      {/* Content */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 6 }}>
+          <CircularProgress sx={{ color: 'primary.main' }} />
+        </Box>
+      )}
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+      )}
+      {!loading && !error && issues.length === 0 && (
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          No Jira issues found.
+        </Typography>
+      )}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+          gap: 3,
+          width: '100%',
+        }}
+      >
+        {issues.map(issue => (
+          <Card
+            key={issue.id}
+            sx={{
+              background: 'rgba(18, 18, 30, 0.7)',
+              borderRadius: 2,
+              boxShadow: '0 4px 16px rgba(156,39,176,0.08)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#fff',
+              height: 'auto', // Changed from fixed height to auto
+              minHeight: 260, // Added minimum height
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 8px 24px rgba(156,39,176,0.15)',
+              },
+            }}
+            variant="outlined"
+            onClick={() => handleCardClick(issue)}
+          >
+            <CardHeader
+              avatar={
+                <Avatar
+                  src={issue.fields.assignee?.avatarUrls?.['32x32']}
+                  sx={{ bgcolor: '#9c27b0' }}
+                >
+                  {issue.fields.assignee?.displayName?.[0] || '?'}
+                </Avatar>
+              }
+              title={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography
+                    variant="subtitle2"
+                    sx={gradientText}
+                  >
+                    {issue.key}
+                  </Typography>
+                  <Chip
+                    label={issue.fields.status.name}
+                    size="small"
+                    sx={{
+                      ml: 1,
+                      background: 'rgba(255,255,255,0.08)',
+                      color: 'white',
+                      fontWeight: 500,
+                    }}
+                  />
+                  {issue.fields.priority && (
+                    <Chip
+                      label={issue.fields.priority.name}
+                      size="small"
+                      sx={{
+                        ml: 1,
+                        background: 'rgba(231, 76, 60, 0.15)',
+                        color: 'white',
+                        fontWeight: 500,
+                      }}
+                    />
+                  )}
+                </Box>
+              }
+              subheader={
+                <Typography sx={{ ...gradientText, fontWeight: 600, fontSize: '1rem', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                  {issue.fields.summary}
+                </Typography>
+              }
+              subheaderTypographyProps={{ sx: { color: '#fff', fontWeight: 500 } }}
+              sx={{ pb: 0 }}
+            />
+            <CardContent sx={{ pt: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: 'rgba(255,255,255,0.8)',
+                  mb: 1,
+                  maxHeight: 60,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'pre-line',
+                  wordBreak: 'break-word',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
+                {issue.fields.description
+                  ? issue.fields.description
+                  : 'No description.'}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Assignee
+                  </Typography>
+                  <Typography variant="body2" sx={gradientText}>
+                    {issue.fields.assignee?.displayName || 'Unassigned'}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Reporter
+                  </Typography>
+                  <Typography variant="body2" sx={gradientText}>
+                    {issue.fields.reporter?.displayName || 'Unknown'}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+
+      {/* Issue Detail Dialog */}
+      <Dialog
+        open={!!selectedIssue}
+        onClose={handleCloseDialog}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: 'rgba(18, 18, 30, 0.95)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            color: '#fff',
+            minHeight: '60vh',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        {selectedIssue && (
+          <>
+            <DialogTitle sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              pb: 2
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography sx={{ ...gradientText, fontSize: '1.3rem' }}>
+                  {selectedIssue.key}
+                </Typography>
+                <Chip
+                  label={selectedIssue.fields.status.name}
+                  size="small"
+                  sx={{
+                    background: 'rgba(255,255,255,0.08)',
+                    color: 'white',
+                    fontWeight: 500,
+                  }}
+                />
+                {selectedIssue.fields.priority && (
+                  <Chip
+                    label={selectedIssue.fields.priority.name}
+                    size="small"
+                    sx={{
+                      background: 'rgba(231, 76, 60, 0.15)',
+                      color: 'white',
+                      fontWeight: 500,
+                    }}
+                  />
+                )}
+              </Box>
+              <IconButton
+                onClick={handleCloseDialog}
+                sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ p: 3 }}>
+              <Typography variant="h5" sx={{ ...gradientText, mb: 3, fontSize: '1.5rem' }}>
+                {selectedIssue.fields.summary}
+              </Typography>
+
+              {/* Issue content - description and details side by side */}
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+                {/* Description - left side */}
+                <Box sx={{ flex: { md: '0 0 66.67%' }, width: '100%' }}>
+                  <Paper sx={{
+                    p: 3,
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: 2,
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    height: '100%',
+                    maxHeight: { md: '40vh' } // Limit the height to 40% of viewport height
+                  }}>
+                    <Typography variant="subtitle1" sx={{ mb: 1, color: 'text.secondary', fontSize: '1.1rem' }}>
+                      Description
+                    </Typography>
+                    <Paper sx={{
+                      p: 2,
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      borderRadius: 2,
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      height: 'calc(100% - 40px)', // Fill remaining height minus the title
+                      overflow: 'auto',
+                      mx: 0 // Constant margin (0) from parent div
+                    }}>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: '1rem' }}>
+                        {/* Process description to handle image tags */}
+                        {selectedIssue.fields.description ?
+                          selectedIssue.fields.description.replace(
+                            /!([^|]+)\|width=(\d+),height=(\d+),alt="([^"]+)"!/g,
+                            '[Image: $4]'
+                          ) :
+                          'No description provided.'
+                        }
+                      </Typography>
+                    </Paper>
+                  </Paper>
+                </Box>
+
+                {/* Issue Details - right side */}
+                <Box sx={{
+                  flex: { md: '0 0 33.33%' },
+                  width: '100%',
+                  paddingRight: { md: 3 } // Added padding-right instead of margin
+                }}>
+                  <Paper sx={{
+                    p: 3,
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: 2,
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    height: '100%',
+                    maxHeight: { md: '40vh' }, // Limit the height to 40% of viewport height
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2 // Reduced gap from 3 to 2
+                  }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary', fontSize: '1.1rem' }}>
+                      Issue Details
+                    </Typography>
+
+                    <Box>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                        Status
+                      </Typography>
+                      <Typography variant="body2" sx={{ ...gradientText, fontSize: '1.05rem' }}>
+                        {selectedIssue.fields.status.name}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                        Assignee
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Avatar
+                          src={selectedIssue.fields.assignee?.avatarUrls?.['48x48']} // Using larger avatar image
+                          sx={{ width: 32, height: 32, bgcolor: '#9c27b0' }}
+                        >
+                          {selectedIssue.fields.assignee?.displayName?.[0] || '?'}
+                        </Avatar>
+                        <Typography variant="body2" sx={{ ...gradientText, fontSize: '1.05rem' }}>
+                          {selectedIssue.fields.assignee?.displayName || 'Unassigned'}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                        Reporter
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Avatar
+                          src={selectedIssue.fields.reporter?.avatarUrls?.['48x48']} // Using larger avatar image
+                          sx={{ width: 32, height: 32, bgcolor: '#7e57c2' }}
+                        >
+                          {selectedIssue.fields.reporter?.displayName?.[0] || '?'}
+                        </Avatar>
+                        <Typography variant="body2" sx={{ ...gradientText, fontSize: '1.05rem' }}>
+                          {selectedIssue.fields.reporter?.displayName || 'Unknown'}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {selectedIssue.fields.priority && (
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                          Priority
+                        </Typography>
+                        <Typography variant="body2" sx={{ ...gradientText, fontSize: '1.05rem' }}>
+                          {selectedIssue.fields.priority.name}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Paper>
+                </Box>
+              </Box>
+
+              {/* AI Summary Section - full width below description and details */}
+              <Box sx={{ mt: 3, maxHeight: '30vh' }}> {/* Added maxHeight to ensure it fits */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="subtitle1" sx={{ color: 'text.secondary', fontSize: '1.1rem' }}>
+                    AI Summary
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleSummarizeIssue}
+                    disabled={summaryLoading}
+                    startIcon={summaryLoading ?
+                      <CircularProgress size={16} /> :
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" fill="currentColor"/>
+                        <path d="M12 11C12.55 11 13 10.55 13 10C13 9.45 12.55 9 12 9C11.45 9 11 9.45 11 10C11 10.55 11.45 11 12 11Z" fill="currentColor"/>
+                        <path d="M12 15C12.55 15 13 14.55 13 14V13C13 12.45 12.55 12 12 12C11.45 12 11 12.45 11 13V14C11 14.55 11.45 15 12 15Z" fill="currentColor"/>
+                        <path d="M7 11.5C7.83 11.5 8.5 10.83 8.5 10C8.5 9.17 7.83 8.5 7 8.5C6.17 8.5 5.5 9.17 5.5 10C5.5 10.83 6.17 11.5 7 11.5Z" fill="currentColor"/>
+                        <path d="M17 11.5C17.83 11.5 18.5 10.83 18.5 10C18.5 9.17 17.83 8.5 17 8.5C16.17 8.5 15.5 9.17 15.5 10C15.5 10.83 16.17 11.5 17 11.5Z" fill="currentColor"/>
+                        <path d="M12 17C13.1 17 14 16.1 14 15C14 13.9 13.1 13 12 13C10.9 13 10 13.9 10 15C10 16.1 10.9 17 12 17Z" fill="currentColor"/>
+                      </svg>
+                    }
+                    sx={{
+                      borderColor: 'rgba(156, 39, 176, 0.5)',
+                      color: 'primary.main',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        background: 'rgba(156, 39, 176, 0.08)',
+                      },
+                      fontSize: '0.9rem',
+                      py: 0.8
+                    }}
+                  >
+                    {issueSummary ? 'Refresh Summary' : 'Summarize with AI'}
+                  </Button>
+                </Box>
+
+                <Paper sx={{
+                  p: 2,
+                  background: issueSummary ? 'rgba(156, 39, 176, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                  borderRadius: 2,
+                  border: '1px solid rgba(156, 39, 176, 0.2)',
+                  minHeight: 150,
+                  transition: 'all 0.3s ease',
+                }}>
+                  {summaryLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 150 }}>
+                      <CircularProgress size={30} sx={{ color: 'primary.main' }} />
+                    </Box>
+                  ) : issueSummary ? (
+                    <Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Typography variant="body1" sx={{ mb: 2, fontWeight: 500, fontSize: '1.05rem', lineHeight: 1.6, flex: 1 }}>
+                          {issueSummary.summary}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCopyText(issueSummary.summary)}
+                          sx={{
+                            ml: 1,
+                            color: 'primary.main',
+                            '&:hover': { backgroundColor: 'rgba(156, 39, 176, 0.12)' }
+                          }}
+                          title="Copy summary"
+                        >
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+
+                      {issueSummary.rca && (
+                        <>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 1 }}>
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontSize: '1rem' }}>
+                              Root Cause Analysis:
+                            </Typography>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleCopyText(issueSummary.rca || '')}
+                              sx={{
+                                color: 'primary.main',
+                                '&:hover': { backgroundColor: 'rgba(156, 39, 176, 0.12)' }
+                              }}
+                              title="Copy RCA"
+                            >
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Typography variant="body2" sx={{
+                            p: 1.5,
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: 1,
+                            border: '1px solid rgba(156, 39, 176, 0.2)',
+                            fontSize: '0.95rem',
+                            lineHeight: 1.5
+                          }}>
+                            {issueSummary.rca}
+                          </Typography>
+                        </>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 150, flexDirection: 'column', gap: 1 }}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" fill="rgba(156, 39, 176, 0.5)"/>
+                        <path d="M12 11C12.55 11 13 10.55 13 10C13 9.45 12.55 9 12 9C11.45 9 11 9.45 11 10C11 10.55 11.45 11 12 11Z" fill="rgba(156, 39, 176, 0.5)"/>
+                        <path d="M12 15C12.55 15 13 14.55 13 14V13C13 12.45 12.55 12 12 12C11.45 12 11 12.45 11 13V14C11 14.55 11.45 15 12 15Z" fill="rgba(156, 39, 176, 0.5)"/>
+                        <path d="M7 11.5C7.83 11.5 8.5 10.83 8.5 10C8.5 9.17 7.83 8.5 7 8.5C6.17 8.5 5.5 9.17 5.5 10C5.5 10.83 6.17 11.5 7 11.5Z" fill="rgba(156, 39, 176, 0.5)"/>
+                        <path d="M17 11.5C17.83 11.5 18.5 10.83 18.5 10C18.5 9.17 17.83 8.5 17 8.5C16.17 8.5 15.5 9.17 15.5 10C15.5 10.83 16.17 11.5 17 11.5Z" fill="rgba(156, 39, 176, 0.5)"/>
+                        <path d="M12 17C13.1 17 14 16.1 14 15C14 13.9 13.1 13 12 13C10.9 13 10 13.9 10 15C10 16.1 10.9 17 12 17Z" fill="rgba(156, 39, 176, 0.5)"/>
+                      </svg>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                        Click the Summarize button to generate an AI summary of this issue
+                      </Typography>
+                    </Box>
+                  )}
+                </Paper>
+              </Box>
+            </DialogContent>
+          </>
+        )}
+      </Dialog>
+    </Box>
+  );
 }
 
 export default function HomePage() {
   const [message, setMessage] = useState('');
   const [conversation, setConversation] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const hasConversation = conversation.length > 0;
   
   // Add state for diagnostics
@@ -420,20 +1356,64 @@ export default function HomePage() {
   const [systemsData, setSystemsData] = useState<SystemStatus[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Add state for API logs
-  const [apiLogs, setApiLogs] = useState<Record<string, ApiCallLog[]>>({});
-  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
-  const [selectedLog, setSelectedLog] = useState<ApiCallLog | null>(null);
-  const [isOpeningLog, setIsOpeningLog] = useState(false);
-  
-  // Add state for RCA modal
-  const [rcaModalOpen, setRcaModalOpen] = useState(false);
-  const [similarJiraIssues, setSimilarJiraIssues] = useState<JiraIssue[]>([]);
-  const [generatedRca, setGeneratedRca] = useState<string>('');
-  const [isLoadingRca, setIsLoadingRca] = useState(false);
-  const [rcaError, setRcaError] = useState<string | null>(null);
-  
+
+    // Add state for API logs
+    const [apiLogs, setApiLogs] = useState<Record<string, ApiCallLog[]>>({});
+    const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+    const [selectedLog, setSelectedLog] = useState<ApiCallLog | null>(null);
+    const [isOpeningLog, setIsOpeningLog] = useState(false);
+
+    // Add state for RCA modal
+    const [rcaModalOpen, setRcaModalOpen] = useState(false);
+    const [similarJiraIssues, setSimilarJiraIssues] = useState<JiraIssueZee[]>([]);
+    const [generatedRca, setGeneratedRca] = useState<string>('');
+    const [isLoadingRca, setIsLoadingRca] = useState(false);
+    const [rcaError, setRcaError] = useState<string | null>(null);
+
+
+    // Add state for Freshdesk tickets
+  const [freshdeskTickets, setFreshdeskTickets] = useState<FreshdeskTicket[]>([]);
+  const [freshdeskLoading, setFreshdeskLoading] = useState(false);
+
+  // Add state for Freshdesk rules dialog
+  const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
+  const defaultTicketRules = "- If the ticket subject or description contains words like 'error', 'fail', 'bug', or 'issue', set type to 'Bug'.\n" +
+    "- If the ticket contains words like 'feature', 'enhancement', or 'improvement', set type to 'Feature Request'.\n" +
+    "- If the ticket contains urgent language like 'urgent', 'asap', 'immediately', set priority to 3 (High).\n" +
+    "- If the ticket is marked as closed but has no resolution, set resolution to 'Resolved by Success Team'.\n" +
+    "- If the ticket is from a VIP customer, set priority to at least 2 (Medium).";
+  const [ticketRules, setTicketRules] = useState(defaultTicketRules);
+
+  // Load saved rules from localStorage on component mount
+  useEffect(() => {
+    const savedRules = localStorage.getItem('freshdesk-rules');
+    if (savedRules) {
+      setTicketRules(savedRules);
+    }
+  }, []);
+
+  // Function to fetch Freshdesk tickets
+  const fetchFreshdeskTickets = async () => {
+    setFreshdeskLoading(true);
+    try {
+      // Make an actual API call to fetch Freshdesk tickets with the correct endpoint
+      const response = await fetch('http://localhost:8080/api/freshdesk/tickets/all');
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch Freshdesk tickets');
+      }
+
+      const data = await response.json();
+      setFreshdeskTickets(data || []);
+    } catch (err) {
+      console.error("Error fetching Freshdesk tickets:", err);
+      // Set empty array on error to show the "No tickets found" message
+      setFreshdeskTickets([]);
+    } finally {
+      setFreshdeskLoading(false);
+    }
+  };
+
   // Use the typing effect hook
   const { displayedText, isTyping } = useTypingEffect('Hi, Avishek Chatterjee', 70);
 
@@ -495,7 +1475,7 @@ export default function HomePage() {
       CIMS: data.cims,
       WMS: data.wms
     });
-    
+
     return systemStatuses;
   };
 
@@ -542,37 +1522,37 @@ export default function HomePage() {
   // Update the StatusBox component to be clickable when it has logs
   const renderStatusBox = (system: SystemStatus) => {
     const hasLogs = system.callCount > 0;
-    
+
     return (
-      <StatusBox 
-        status={system.status} 
+      <StatusBox
+        status={system.status}
         onClick={() => hasLogs && handleComponentClick(system.name)}
         sx={{ cursor: hasLogs ? 'pointer' : 'default' }}
       >
         <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
           {system.name}
         </Typography>
-        <Typography variant="body1" sx={{ 
-          color: 
-            system.status === 'success' ? 'rgb(46, 204, 113)' : 
-            system.status === 'failure' ? 'rgb(231, 76, 60)' : 
+        <Typography variant="body1" sx={{
+          color:
+            system.status === 'success' ? 'rgb(46, 204, 113)' :
+            system.status === 'failure' ? 'rgb(231, 76, 60)' :
             'rgb(149, 165, 166)',
           fontWeight: 'bold'
         }}>
-          {system.status === 'success' ? 'Success' : 
-           system.status === 'failure' ? 'Failed' : 
+          {system.status === 'success' ? 'Success' :
+           system.status === 'failure' ? 'Failed' :
            'No Calls'}
         </Typography>
         {system.callCount > 0 && (
-          <Chip 
-            label={`${system.callCount} calls`} 
-            size="small" 
-            sx={{ 
-              mt: 1, 
-              background: 'rgba(255, 255, 255, 0.1)', 
+          <Chip
+            label={`${system.callCount} calls`}
+            size="small"
+            sx={{
+              mt: 1,
+              background: 'rgba(255, 255, 255, 0.1)',
               color: 'text.secondary',
               fontSize: '0.7rem'
-            }} 
+            }}
           />
         )}
       </StatusBox>
@@ -588,13 +1568,13 @@ export default function HomePage() {
       try {
         // Make real API call to the provided endpoint
         const response = await fetch(`http://127.0.0.1:3005/api/trace?traceId=${traceId}`);
-        
+
         if (!response.ok) {
           throw new Error(`API request failed with status ${response.status}`);
         }
-        
+
         const data: TraceResponse = await response.json();
-        
+
         // Check if all components have empty data
         if (data.oms.length === 0 && data.cims.length === 0 && data.wms.length === 0) {
           setError("No trace data found for the provided trace ID. Please verify the ID and try again.");
@@ -622,125 +1602,219 @@ export default function HomePage() {
     }
   };
 
-  // Function to open log in a new tab
-  const handleOpenLogDocument = async (logId: string) => {
-    if (isOpeningLog) return;
-    
-    setIsOpeningLog(true);
+    // Function to open log in a new tab
+    const handleOpenLogDocument = async (logId: string) => {
+        if (isOpeningLog) return;
+
+        setIsOpeningLog(true);
+        try {
+            const response = await fetch(`http://127.0.0.1:3005/api/log?id=${logId}`);
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data && data.url) {
+                window.open(data.url, '_blank');
+            } else {
+                console.error('No URL returned from API');
+            }
+        } catch (err) {
+            console.error('Error fetching log document URL:', err);
+        } finally {
+            setIsOpeningLog(false);
+        }
+    };
+
+    // Function to handle RCA button click
+    const handleRcaButtonClick = async () => {
+        if (!selectedLog?.responseBody) return;
+
+        setRcaModalOpen(true);
+        setIsLoadingRca(true);
+        setRcaError(null);
+        setSimilarJiraIssues([]);
+        setGeneratedRca('');
+
+        try {
+            //console.log(selectedLog.responseBody);
+
+            // Pre-process JSON string to handle NaN values before parsing
+            const processedJsonString = selectedLog.responseBody
+                .replace(/:NaN,/g, ':null,')
+                .replace(/:NaN}/g, ':null}');
+
+            let query = "";
+            try {
+                const responseJson = JSON.parse(processedJsonString);
+                query = responseJson.message || responseJson.responseBody?.substring(0, 100) || selectedLog.responseBody.substring(0, 100);
+            } catch (parseError) {
+                console.warn("Failed to parse response JSON, using raw text:", parseError);
+                query = selectedLog.responseBody.substring(0, 100);
+            }
+
+            console.log(query);
+
+            // Call first API to get similar JIRA issues
+            const similarIssuesResponse = await fetch('http://127.0.0.1:5001/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query,
+                    limit: 3
+                })
+            });
+
+            if (!similarIssuesResponse.ok) {
+                throw new Error(`Error fetching similar issues: ${similarIssuesResponse.status}`);
+            }
+
+            const similarIssuesData: SearchResponse = await similarIssuesResponse.json();
+            setSimilarJiraIssues(similarIssuesData.data.results);
+
+            // Call second API to get generated RCA
+            const rcaResponse = await fetch('http://127.0.0.1:5001/api/generate-rca', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query,
+                    limit: 3
+                })
+            });
+
+            if (!rcaResponse.ok) {
+                throw new Error(`Error generating RCA: ${rcaResponse.status}`);
+            }
+
+            const rcaData: RcaResponse = await rcaResponse.json();
+            setGeneratedRca(rcaData.data.rca);
+
+        } catch (err) {
+            console.error('Error in RCA process:', err);
+            setRcaError(err instanceof Error ? err.message : 'An unknown error occurred');
+        } finally {
+            setIsLoadingRca(false);
+        }
+    };
+
+  // Add function to handle copying text
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        // Optional: Show a success message
+        console.log('Text copied to clipboard');
+      })
+      .catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+  };
+
+  // Add useEffect to fetch Freshdesk tickets when the tab changes to 'freshdesk'
+  useEffect(() => {
+    if (activeTab === 'freshdesk') {
+      fetchFreshdeskTickets();
+    }
+  }, [activeTab]); // Only depend on activeTab, not freshdeskTickets.length
+
+  // Add these state variables to your HomePage component
+  const [selectedTicket, setSelectedTicket] = useState<FreshdeskTicket | null>(null);
+  const [ticketEditData, setTicketEditData] = useState<{ actual: any, edited: any } | null>(null);
+  const [ticketEditLoading, setTicketEditLoading] = useState(false);
+  const [ticketEditError, setTicketEditError] = useState<string | null>(null);
+  const [ticketUpdateSuccess, setTicketUpdateSuccess] = useState(false);
+
+  // Add this function to handle ticket click
+  const handleTicketClick = async (ticket: FreshdeskTicket) => {
+    setSelectedTicket(ticket);
+    setTicketEditData(null);
+    setTicketEditError(null);
+    setTicketUpdateSuccess(false);
+    setTicketEditLoading(true);
+
     try {
-      const response = await fetch(`http://127.0.0.1:3005/api/log?id=${logId}`);
-      
+      const response = await fetch(
+        `http://localhost:8080/api/freshdesk/tickets/${ticket.id}/ai-edit?rules=${encodeURIComponent(ticketRules)}`
+      );
+
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        throw new Error('Failed to process ticket');
       }
-      
+
       const data = await response.json();
-      
-      if (data && data.url) {
-        window.open(data.url, '_blank');
-      } else {
-        console.error('No URL returned from API');
-      }
+      setTicketEditData(data);
     } catch (err) {
-      console.error('Error fetching log document URL:', err);
+      console.error('Error processing ticket:', err);
+      setTicketEditError('Failed to process ticket. Please try again.');
     } finally {
-      setIsOpeningLog(false);
+      setTicketEditLoading(false);
     }
   };
 
-  // Function to handle RCA button click
-  const handleRcaButtonClick = async () => {
-    if (!selectedLog?.responseBody) return;
-    
-    setRcaModalOpen(true);
-    setIsLoadingRca(true);
-    setRcaError(null);
-    setSimilarJiraIssues([]);
-    setGeneratedRca('');
-    
+  // Add this function to handle submitting the edited ticket
+  const handleSubmitTicketEdit = async () => {
+    if (!selectedTicket || !ticketEditData) return;
+
+    setTicketEditLoading(true);
+    setTicketUpdateSuccess(false);
+
     try {
-      //console.log(selectedLog.responseBody);
-      
-      // Pre-process JSON string to handle NaN values before parsing
-      const processedJsonString = selectedLog.responseBody
-        .replace(/:NaN,/g, ':null,')
-        .replace(/:NaN}/g, ':null}');
-      
-      let query = "";
-      try {
-        const responseJson = JSON.parse(processedJsonString);
-        query = responseJson.message || responseJson.responseBody?.substring(0, 100) || selectedLog.responseBody.substring(0, 100);
-      } catch (parseError) {
-        console.warn("Failed to parse response JSON, using raw text:", parseError);
-        query = selectedLog.responseBody.substring(0, 100);
-      }
-      
-      console.log(query);
-      
-      // Call first API to get similar JIRA issues
-      const similarIssuesResponse = await fetch('http://127.0.0.1:5001/api/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query,
-          limit: 3
-        })
-      });
-      
-      if (!similarIssuesResponse.ok) {
-        throw new Error(`Error fetching similar issues: ${similarIssuesResponse.status}`);
-      }
+      // Mock API call to update the ticket
+      // In a real implementation, you would send the edited data to your backend
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
 
-      const similarIssuesData: SearchResponse = await similarIssuesResponse.json();
-      setSimilarJiraIssues(similarIssuesData.data.results);
-      
-      // Call second API to get generated RCA
-      const rcaResponse = await fetch('http://127.0.0.1:5001/api/generate-rca', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query,
-          limit: 3
-        })
-      });
+      // Simulate successful update
+      setTicketUpdateSuccess(true);
 
-      if (!rcaResponse.ok) {
-        throw new Error(`Error generating RCA: ${rcaResponse.status}`);
-      }
-      
-      const rcaData: RcaResponse = await rcaResponse.json();
-      setGeneratedRca(rcaData.data.rca);
-      
+      // Refresh the tickets list after a successful update
+      setTimeout(() => {
+        fetchFreshdeskTickets();
+        setSelectedTicket(null); // Close the dialog
+      }, 1500);
     } catch (err) {
-      console.error('Error in RCA process:', err);
-      setRcaError(err instanceof Error ? err.message : 'An unknown error occurred');
+      console.error('Error updating ticket:', err);
+      setTicketEditError('Failed to update ticket. Please try again.');
     } finally {
-      setIsLoadingRca(false);
+      setTicketEditLoading(false);
     }
   };
+
+  // Update the typing animation logic
+  useEffect(() => {
+    if (!hasConversation) {
+      const text = "Welcome to AI Support Assistant";
+      let currentIndex = 0;
+
+      // Remove this useEffect since you're already using the useTypingEffect hook
+      // The custom hook already handles the typing animation
+    }
+  }, [hasConversation]);
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%)' }}>
       {/* Sidebar */}
       <StyledDrawer>
-        <Box sx={{ p: 2, pt: 3 }}>
-          <NewChatButton>
-            <ListItemIcon sx={{ color: 'white', minWidth: 36 }}>
-              <AddIcon />
-            </ListItemIcon>
-            <ListItemText primary="New Chat" primaryTypographyProps={{ fontWeight: 'medium' }} />
-          </NewChatButton>
-        </Box>
-        <Divider sx={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }} />
         <List sx={{ px: 1, flexGrow: 1 }}>
           {[
-            { text: 'Recent Chats', icon: <ChatIcon />, id: 'chat' },
+            { text: 'API Dashboard', icon: <DashboardIcon />, id: 'dashboard' },
             { text: 'API Diagnostics', icon: <DiagnosticsIcon />, id: 'diagnostics' },
-            { text: 'Settings', icon: <SettingsIcon />, id: 'settings' }
+            { text: 'Jira RCA Analysis', icon: <BugReportIcon />, id: 'jira' },
+            { text: 'Freshdesk Fixer', icon: <SupportIcon />, id: 'freshdesk' },
+            // Recent Chats moved to the bottom with vision tag
+            {
+              text: 'Recent Chats',
+              icon: <ChatIcon />,
+              id: 'chat',
+              tag: {
+                text: 'Vision',
+                icon: <VisibilityIcon style={{ fontSize: 14 }} />
+              }
+            }
           ].map((item) => (
             <ListItem key={item.text} disablePadding>
               <ListItemButton 
@@ -759,6 +1833,23 @@ export default function HomePage() {
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText primary={item.text} />
+
+                {/* Add Vision tag if present */}
+                {item.tag && (
+                  <Chip
+                    label={item.tag.text}
+                    size="small"
+                    icon={item.tag.icon}
+                    sx={{
+                      height: 20,
+                      fontSize: '0.7rem',
+                      backgroundColor: 'rgba(156, 39, 176, 0.15)',
+                      color: '#9c27b0',
+                      '& .MuiChip-icon': { color: '#9c27b0' },
+                      ml: 1
+                    }}
+                  />
+                )}
               </ListItemButton>
             </ListItem>
           ))}
@@ -797,7 +1888,7 @@ export default function HomePage() {
                       transitionDelay: '0.3s'
                     }}
                   >
-                    How can I help you today?
+                    Hello Avishek Chatterjee, how can I help you today?
                   </Typography>
                   
                   {/* Default prompts - only show after typing is complete */}
@@ -912,7 +2003,7 @@ export default function HomePage() {
             position: 'relative'
           }}>
             <Typography variant="h4" sx={{ 
-              mb: 4, 
+              mb: 4,
               mt: 1,
               color: '#fff',
               background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
@@ -1023,7 +2114,7 @@ export default function HomePage() {
                 )}
               </Box>
             ) : (
-              <Box sx={{ width: '100%', maxWidth: '1000px', mt: -1 }}>
+              <Box sx={{ width: '100%', maxWidth: '1200px', margin: '0 auto', mt: -1 }}>
                 {/* API Call Summary */}
                 <Box 
                   sx={{ 
@@ -1082,7 +2173,19 @@ export default function HomePage() {
                     New Search
                   </Button>
                 </Box>
-                
+
+              {/*<DiagnosticsContainer sx={{*/}
+              {/*    width: '100%',*/}
+              {/*    maxWidth: '1200px', // Increased max width*/}
+              {/*    margin: '0 auto' // Center the container*/}
+              {/*}}>*/}
+              {/*    <DiagnosticsRow sx={{*/}
+              {/*        position: 'relative',*/}
+              {/*        display: 'flex',*/}
+              {/*        justifyContent: 'space-between', // Ensure even spacing*/}
+              {/*        flexWrap: { xs: 'wrap', md: 'nowrap' }, // Allow wrapping on small screens*/}
+              {/*        gap: 2 // Add gap between items*/}
+              {/*    }}>*/}
                 <DiagnosticsContainer>
                   <DiagnosticsRow sx={{ position: 'relative', mt: -1 }}>
                     {['WMS', 'OMS', 'CIMS', 'Proxy', 'RMS'].map((name, index) => {
@@ -1102,7 +2205,7 @@ export default function HomePage() {
                           {index < 4 && (
                             <HorizontalConnector 
                               key={`connector-${name}`}
-                              sx={{ 
+                              sx={{
                                 position: 'absolute', 
                                 top: '75px', 
                                 right: '-20px',
@@ -1114,7 +2217,7 @@ export default function HomePage() {
                           {isProxy && (
                             <Box 
                               key={`vertical-connector-${name}`}
-                              sx={{ 
+                              sx={{
                                 position: 'absolute',
                                 top: '150px',
                                 left: '100px',
@@ -1139,17 +2242,17 @@ export default function HomePage() {
                     ml: '322px', /* Adjusted to align with Proxy after making boxes smaller */
                     zIndex: 1
                   }}>
-                    {renderStatusBox(systemsData.find(s => s.name === 'Channel') || { 
-                      name: 'Channel', 
-                      status: 'inactive', 
-                      callCount: 0 
+                    {renderStatusBox(systemsData.find(s => s.name === 'Channel') || {
+                      name: 'Channel',
+                      status: 'inactive',
+                      callCount: 0
                     })}
                   </Box>
 
                   {/* API Logs list and details side by side */}
                   {selectedComponent && apiLogs[selectedComponent]?.length > 0 && (
-                    <Box sx={{ 
-                      display: 'flex', 
+                    <Box sx={{
+                      display: 'flex',
                       flexDirection: 'row',
                       width: '100%',
                       maxWidth: '900px',
@@ -1160,8 +2263,8 @@ export default function HomePage() {
                       mb: 5,
                       pb: 2
                     }}>
-                      <ApiLogsList sx={{ 
-                        maxWidth: selectedLog ? '350px' : '900px', 
+                      <ApiLogsList sx={{
+                        maxWidth: selectedLog ? '350px' : '900px',
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column'
@@ -1169,14 +2272,14 @@ export default function HomePage() {
                         <Typography variant="h6" sx={{ mb: 2, flexShrink: 0 }}>
                           {selectedComponent} API Call Logs ({apiLogs[selectedComponent].length})
                         </Typography>
-                        <Box sx={{ 
-                          overflowY: 'auto', 
+                        <Box sx={{
+                          overflowY: 'auto',
                           flex: '1 1 auto',
                           '&::-webkit-scrollbar': {
                             width: '8px',
                           },
                           '&::-webkit-scrollbar-thumb': {
-                            backgroundColor: 'rgba(255, 255, 255, 0.2)', 
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
                             borderRadius: '4px'
                           },
                           '&::-webkit-scrollbar-track': {
@@ -1186,10 +2289,10 @@ export default function HomePage() {
                         }}>
                           <List>
                             {apiLogs[selectedComponent].map((log) => (
-                              <ListItem 
-                                key={log._id} 
-                                onClick={() => handleLogClick(log)} 
-                                sx={{ 
+                              <ListItem
+                                key={log._id}
+                                onClick={() => handleLogClick(log)}
+                                sx={{
                                   cursor: 'pointer',
                                   borderLeft: `4px solid ${log.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}`,
                                   mb: 1,
@@ -1202,7 +2305,7 @@ export default function HomePage() {
                               >
                                 <ListItemText
                                   primary={
-                                    <Typography 
+                                    <Typography
                                       color={log.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}
                                       sx={{ fontWeight: 'bold' }}
                                     >
@@ -1228,15 +2331,15 @@ export default function HomePage() {
 
                       {/* API Log Details */}
                       {selectedLog && (
-                        <ApiLogDetails sx={{ 
+                        <ApiLogDetails sx={{
                           height: '100%',
                           display: 'flex',
                           flexDirection: 'column',
                           overflowY: 'auto'
                         }}>
-                          <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                          <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
                             justifyContent: 'space-between',
                             mb: 1,
                             flexShrink: 0
@@ -1245,7 +2348,7 @@ export default function HomePage() {
                             <Box sx={{ display: 'flex', gap: 1 }}>
                               {selectedLog && selectedLog.status !== 'SUCCESS' && (
                                 <Tooltip title="Analyze Root Cause">
-                                  <IconButton 
+                                  <IconButton
                                     size="small"
                                     color="primary"
                                     onClick={handleRcaButtonClick}
@@ -1262,7 +2365,7 @@ export default function HomePage() {
                               )}
                               <Tooltip title="Open log document in new tab">
                                 <div>
-                                  <IconButton 
+                                  <IconButton
                                     size="small"
                                     color="primary"
                                     onClick={() => handleOpenLogDocument(selectedLog._id)}
@@ -1274,8 +2377,8 @@ export default function HomePage() {
                                       }
                                     }}
                                   >
-                                    {isOpeningLog ? 
-                                      <CircularProgress size={20} color="inherit" /> : 
+                                    {isOpeningLog ?
+                                      <CircularProgress size={20} color="inherit" /> :
                                       <OpenInNewIcon fontSize="small" />
                                     }
                                   </IconButton>
@@ -1283,11 +2386,11 @@ export default function HomePage() {
                               </Tooltip>
                             </Box>
                           </Box>
-                          
-                          <Box sx={{ 
-                            display: 'flex', 
-                            flexWrap: 'wrap', 
-                            gap: 1.5, 
+
+                          <Box sx={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 1.5,
                             overflowY: 'auto',
                             flex: '1 1 auto',
                             pr: 1
@@ -1300,7 +2403,7 @@ export default function HomePage() {
                             </Box>
                             <Box sx={{ flex: '1 1 45%', minWidth: '200px' }}>
                               <Typography variant="subtitle2" color="text.secondary">Status</Typography>
-                              <Typography 
+                              <Typography
                                 color={selectedLog.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}
                                 sx={{ fontWeight: 'bold' }}
                               >
@@ -1331,15 +2434,15 @@ export default function HomePage() {
                                 <Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{new Date(selectedLog.timestamp || '').toLocaleString()}</Typography>
                               </Tooltip>
                             </Box>
-                            
+
                             {selectedLog.requestBody && (
                               <Box sx={{ flex: '1 1 100%' }}>
                                 <Typography variant="subtitle2" color="text.secondary">Request Body</Typography>
-                                <Paper 
-                                  sx={{ 
-                                    p: 1.5, 
-                                    backgroundColor: 'rgba(0,0,0,0.3)', 
-                                    maxHeight: '120px', 
+                                <Paper
+                                  sx={{
+                                    p: 1.5,
+                                    backgroundColor: 'rgba(0,0,0,0.3)',
+                                    maxHeight: '120px',
                                     overflow: 'auto',
                                     fontFamily: 'monospace',
                                     fontSize: '0.85rem',
@@ -1351,15 +2454,15 @@ export default function HomePage() {
                                 </Paper>
                               </Box>
                             )}
-                            
+
                             {selectedLog.responseBody && (
                               <Box sx={{ flex: '1 1 100%' }}>
                                 <Typography variant="subtitle2" color="text.secondary">Response Body</Typography>
-                                <Paper 
-                                  sx={{ 
-                                    p: 1.5, 
-                                    backgroundColor: 'rgba(0,0,0,0.3)', 
-                                    maxHeight: '120px', 
+                                <Paper
+                                  sx={{
+                                    p: 1.5,
+                                    backgroundColor: 'rgba(0,0,0,0.3)',
+                                    maxHeight: '120px',
                                     overflow: 'auto',
                                     fontFamily: 'monospace',
                                     fontSize: '0.85rem',
@@ -1371,15 +2474,15 @@ export default function HomePage() {
                                 </Paper>
                               </Box>
                             )}
-                            
+
                             {selectedLog.http_headers && (
                               <Box sx={{ flex: '1 1 100%' }}>
                                 <Typography variant="subtitle2" color="text.secondary">HTTP Headers</Typography>
-                                <Paper 
-                                  sx={{ 
-                                    p: 1.5, 
-                                    backgroundColor: 'rgba(0,0,0,0.3)', 
-                                    maxHeight: '120px', 
+                                <Paper
+                                  sx={{
+                                    p: 1.5,
+                                    backgroundColor: 'rgba(0,0,0,0.3)',
+                                    maxHeight: '120px',
                                     overflow: 'auto',
                                     fontFamily: 'monospace',
                                     fontSize: '0.85rem',
@@ -1402,9 +2505,971 @@ export default function HomePage() {
           </Box>
         )}
 
+        {activeTab === 'jira' && (
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              overflow: 'auto',
+              px: 2,
+              py: 4,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Heading with icon */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <BugReportIcon sx={{
+                fontSize: 38,
+                mr: 1,
+                background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 700
+              }} />
+              <Typography variant="h4" sx={{
+                background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 700
+              }}>
+                Jira RCA Analysis
+              </Typography>
+            </Box>
+
+            <Typography variant="subtitle1" sx={{
+              color: 'text.secondary',
+              ml: 5,
+              maxWidth: '800px',
+              lineHeight: 1.6,
+            }}>
+              🔍 Analyze Jira issues to extract root cause patterns and insights ⚡ Generate AI-powered summaries and RCA documentation to speed up troubleshooting and prevent recurring issues. 📊 Turn support tickets into actionable knowledge. 🚀
+            </Typography>
+
+            <JiraRcaAnalysis />
+          </Box>
+        )}
+
+        {activeTab === 'freshdesk' && (
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              overflow: 'auto',
+              px: 2,
+              py: 4,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Heading with icon and description */}
+            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <SupportIcon sx={{
+                    fontSize: 38,
+                    mr: 1,
+                    background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontWeight: 700
+                  }} />
+                  <Typography variant="h4" sx={{
+                    background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontWeight: 700
+                  }}>
+                    Freshdesk Fixer
+                  </Typography>
+
+                  {/* Settings button */}
+                  <IconButton
+                    onClick={() => setRulesDialogOpen(true)}
+                    sx={{
+                      ml: 2,
+                      color: 'primary.main',
+                      background: 'rgba(156, 39, 176, 0.08)',
+                      '&:hover': {
+                        background: 'rgba(156, 39, 176, 0.15)',
+                      }
+                    }}
+                    title="Edit Rules"
+                  >
+                    <SettingsIcon />
+                  </IconButton>
+                </Box>
+
+                <Typography variant="subtitle1" sx={{
+                  color: 'text.secondary',
+                  ml: 5,
+                  maxWidth: '800px',
+                  lineHeight: 1.6
+                }}>
+                  ✨ Automatically fix recently closed Freshdesk tickets with missing or incorrect fields ✅ Ensure proper data reconciliation for team-level analysis and reporting, eliminating manual review work. 🚀
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Freshdesk content */}
+            {freshdeskLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 6 }}>
+                <CircularProgress sx={{ color: 'primary.main' }} />
+              </Box>
+            ) : freshdeskTickets.length === 0 ? (
+              <Box sx={{ textAlign: 'center', my: 6 }}>
+                <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+                  No Freshdesk tickets found
+                </Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchFreshdeskTickets}
+                  sx={{
+                    borderColor: 'rgba(156, 39, 176, 0.5)',
+                    color: 'primary.main',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      background: 'rgba(156, 39, 176, 0.08)',
+                    }
+                  }}
+                >
+                  Refresh Tickets
+                </Button>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+                  gap: 3,
+                  width: '100%',
+                }}
+              >
+                {freshdeskTickets.map(ticket => (
+                  <Card
+                    key={ticket.id}
+                    sx={{
+                      background: 'rgba(18, 18, 30, 0.7)',
+                      borderRadius: 2,
+                      boxShadow: '0 4px 16px rgba(156,39,176,0.08)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#fff',
+                      height: 'auto', // Changed from fixed height to auto
+                      minHeight: 260, // Added minimum height
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: '0 8px 24px rgba(156,39,176,0.15)',
+                      },
+                    }}
+                    variant="outlined"
+                    onClick={() => handleTicketClick(ticket)}
+                  >
+                    <CardHeader
+                      title={
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontWeight: 700,
+                          }}
+                        >
+                          #{ticket.id} - {ticket.subject}
+                        </Typography>
+                      }
+                      subheader={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                          <Chip
+                            label={ticket.status === 2 ? 'Open' : ticket.status === 3 ? 'Pending' : ticket.status === 4 ? 'Resolved' : 'Closed'}
+                            size="small"
+                            sx={{
+                              background: ticket.status === 2 ? 'rgba(231, 76, 60, 0.15)' :
+                                       ticket.status === 3 ? 'rgba(241, 196, 15, 0.15)' :
+                                       'rgba(46, 204, 113, 0.15)',
+                              color: 'white',
+                              fontWeight: 500,
+                            }}
+                          />
+                          <Chip
+                            label={ticket.priority === 1 ? 'Low' : ticket.priority === 2 ? 'Medium' : ticket.priority === 3 ? 'High' : 'Urgent'}
+                            size="small"
+                            sx={{
+                              background: 'rgba(255,255,255,0.08)',
+                              color: 'white',
+                              fontWeight: 500,
+                            }}
+                          />
+                          <Typography variant="caption" sx={{ color: 'text.secondary', ml: 'auto' }}>
+                            {new Date(ticket.created_at).toLocaleDateString()}
+                          </Typography>
+                        </Box>
+                      }
+                      subheaderTypographyProps={{ sx: { color: '#fff', fontWeight: 500 } }}
+                      sx={{ pb: 0 }}
+                    />
+                    <CardContent sx={{ pt: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      {/* Description - wrapped text with ellipsis */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: 'rgba(255,255,255,0.8)',
+                          mb: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          fontSize: '0.9rem',
+                        }}
+                      >
+                        {ticket.subject}
+                      </Typography>
+
+                      <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            Client
+                          </Typography>
+                          <Typography variant="body2" sx={{
+                            background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontWeight: 700,
+                          }}>
+                            {ticket.custom_fields.cf_client || 'Unknown'}
+                          </Typography>
+                        </Box>
+
+                        <Box>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            Updated
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                            {new Date(ticket.updated_at).toLocaleDateString()}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {ticket.custom_fields.cf_rca && (
+                        <Box sx={{ mt: 2 }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            Root Cause
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: 'text.primary',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                            }}
+                          >
+                            {ticket.custom_fields.cf_rca}
+                          </Typography>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            )}
+
+            {/* Rules Dialog */}
+            <Dialog
+              open={rulesDialogOpen}
+              onClose={() => setRulesDialogOpen(false)}
+              maxWidth="md"
+              fullWidth
+              PaperProps={{
+                sx: {
+                  background: 'rgba(18, 18, 30, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  borderRadius: 3,
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: '#fff',
+                },
+              }}
+            >
+              <DialogTitle sx={{
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <EditIcon sx={{
+                    mr: 1.5,
+                    fontSize: 24,
+                    color: 'primary.main'
+                  }} />
+                  <Typography sx={{
+                    background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontWeight: 700,
+                    fontSize: '1.3rem'
+                  }}>
+                    Edit Ticket Processing Rules
+                  </Typography>
+                </Box>
+                <IconButton
+                  onClick={() => setRulesDialogOpen(false)}
+                  sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </DialogTitle>
+              <DialogContent sx={{ py: 3 }}>
+                <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Define rules for automatically fixing Freshdesk tickets. Each rule should be on a new line.
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={10}
+                  value={ticketRules}
+                  onChange={(e) => setTicketRules(e.target.value)}
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: 'rgba(30, 30, 40, 0.6)',
+                      borderRadius: 2,
+                      '&.Mui-focused': {
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: 'rgba(156, 39, 176, 0.5)',
+                          borderWidth: 1,
+                        },
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      color: '#f5f5f5',
+                      fontFamily: 'monospace',
+                      fontSize: '0.9rem',
+                    },
+                  }}
+                />
+                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setTicketRules(defaultTicketRules)}
+                    sx={{
+                      borderColor: 'rgba(156, 39, 176, 0.5)',
+                      color: 'primary.main',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        background: 'rgba(156, 39, 176, 0.08)',
+                      },
+                    }}
+                  >
+                    Reset to Default
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      // Save rules and close dialog
+                      localStorage.setItem('freshdesk-rules', ticketRules);
+                      setRulesDialogOpen(false);
+                    }}
+                    sx={{
+                      background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                      '&:hover': {
+                        background: 'linear-gradient(90deg, #8e24aa, #6a52b3)',
+                      },
+                    }}
+                  >
+                    Save Rules
+                  </Button>
+                </Box>
+              </DialogContent>
+            </Dialog>
+
+            {/* Ticket Edit Dialog */}
+            <Dialog
+              open={!!selectedTicket}
+              onClose={() => !ticketEditLoading && setSelectedTicket(null)}
+              maxWidth="md" // Changed from "lg" to "md" to make it narrower
+              fullWidth
+              PaperProps={{
+                sx: {
+                  background: 'rgba(18, 18, 30, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  borderRadius: 3,
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: '#fff',
+                  maxWidth: '1000px', // Added explicit max width
+                  margin: 'auto',
+                },
+              }}
+            >
+              {selectedTicket && (
+                <>
+                  <DialogTitle sx={{
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <CompareArrowsIcon sx={{
+                        mr: 1.5,
+                        fontSize: 24,
+                        color: 'primary.main'
+                      }} />
+                      <Typography sx={{
+                        background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        fontWeight: 700,
+                        fontSize: '1.3rem'
+                      }}>
+                        AI Ticket Edit - #{selectedTicket.id}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      onClick={() => !ticketEditLoading && setSelectedTicket(null)}
+                      sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+                      disabled={ticketEditLoading}
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  </DialogTitle>
+                  <DialogContent sx={{ py: 3 }}>
+                    {ticketEditLoading ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+                        {/* Updated Lottie Animation URL */}
+                        <Box sx={{ width: 200, height: 200, mb: 3 }}>
+                          <iframe
+                            src="https://lottie.host/embed/147e3a35-16bd-4fbe-840e-87679193ae24/xxKoZbh1uc.lottie"
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            allowFullScreen
+                            title="AI Processing Animation"
+                          ></iframe>
+                        </Box>
+
+                        {/* Rotating Loading Messages */}
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            color: 'primary.main',
+                            fontWeight: 500,
+                            textAlign: 'center',
+                            animation: 'fadeInOut 2s infinite ease-in-out',
+                            '@keyframes fadeInOut': {
+                              '0%': { opacity: 0 },
+                              '20%': { opacity: 1 },
+                              '80%': { opacity: 1 },
+                              '100%': { opacity: 0 },
+                            }
+                          }}
+                        >
+                          <LoadingMessage />
+                        </Typography>
+                      </Box>
+                    ) : ticketEditError ? (
+                      <Box sx={{
+                        p: 3,
+                        textAlign: 'center',
+                        background: 'rgba(231, 76, 60, 0.1)',
+                        borderRadius: 2,
+                        border: '1px solid rgba(231, 76, 60, 0.3)'
+                      }}>
+                        <Typography color="error">{ticketEditError}</Typography>
+                        <Button
+                          variant="outlined"
+                          onClick={() => handleTicketClick(selectedTicket)}
+                          sx={{
+                            mt: 2,
+                            borderColor: 'rgba(231, 76, 60, 0.5)',
+                            color: '#e74c3c',
+                            '&:hover': {
+                              borderColor: '#e74c3c',
+                              background: 'rgba(231, 76, 60, 0.08)',
+                            }
+                          }}
+                        >
+                          Try Again
+                        </Button>
+                      </Box>
+                    ) : ticketUpdateSuccess ? (
+                      <Box sx={{
+                        p: 3,
+                        textAlign: 'center',
+                        background: 'rgba(46, 204, 113, 0.1)',
+                        borderRadius: 2,
+                        border: '1px solid rgba(46, 204, 113, 0.3)'
+                      }}>
+                        <CheckCircleIcon sx={{ fontSize: 48, color: '#2ecc71', mb: 2 }} />
+                        <Typography variant="h6" sx={{ color: '#2ecc71', mb: 1 }}>
+                          Ticket Updated Successfully!
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          The changes have been applied to the ticket.
+                        </Typography>
+                      </Box>
+                    ) : ticketEditData ? (
+                      <>
+                        <Typography variant="subtitle1" sx={{ mb: 3, color: 'text.secondary' }}>
+                          Review the AI-suggested changes to this ticket:
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+                          {/* Original Ticket */}
+                          <Box sx={{ flex: 1 }}>
+                            <Paper sx={{
+                              p: 2,
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              borderRadius: 2,
+                              border: '1px solid rgba(255, 255, 255, 0.05)',
+                              height: '100%'
+                            }}>
+                              <Typography variant="subtitle2" sx={{
+                                mb: 2,
+                                color: 'text.secondary',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}>
+                                <AssignmentIcon sx={{ mr: 1, fontSize: 20 }} />
+                                Original Ticket
+                              </Typography>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Subject
+                                </Typography>
+                                <Typography variant="body2">
+                                  {ticketEditData.actual.subject}
+                                </Typography>
+                              </Box>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Status
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Chip
+                                    label={
+                                      ticketEditData.actual.status === 2 ? 'Open' :
+                                      ticketEditData.actual.status === 3 ? 'Pending' :
+                                      ticketEditData.actual.status === 4 ? 'Resolved' : 'Closed'
+                                    }
+                                    size="small"
+                                    sx={{
+                                      mr: 1,
+                                      background: ticketEditData.actual.status === 2 ? 'rgba(231, 76, 60, 0.15)' :
+                                                ticketEditData.actual.status === 3 ? 'rgba(241, 196, 15, 0.15)' :
+                                                'rgba(46, 204, 113, 0.15)',
+                                      color: 'white',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                  {ticketEditData.actual.status !== ticketEditData.edited.status && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <AutoFixHighIcon sx={{ color: 'primary.main', fontSize: 16, mr: 0.5 }} />
+                                      <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500 }}>
+                                        Changed
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Box>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Priority
+                                </Typography>
+                                <Chip
+                                  label={
+                                    ticketEditData.actual.priority === 1 ? 'Low' :
+                                    ticketEditData.actual.priority === 2 ? 'Medium' :
+                                    ticketEditData.actual.priority === 3 ? 'High' : 'Urgent'
+                                  }
+                                  size="small"
+                                  sx={{
+                                    ml: 1,
+                                    background: 'rgba(255,255,255,0.08)',
+                                    color: 'white',
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              </Box>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Type
+                                </Typography>
+                                <Typography variant="body2">
+                                  {ticketEditData.actual.type || 'Not set'}
+                                </Typography>
+                              </Box>
+
+                              {ticketEditData.actual.custom_fields && (
+                                <>
+                                  <Box sx={{ mb: 2 }}>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      Client
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {ticketEditData.actual.custom_fields.cf_client || 'Not set'}
+                                    </Typography>
+                                  </Box>
+
+                                  <Box sx={{ mb: 2 }}>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      Root Cause
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {ticketEditData.actual.custom_fields.cf_rca || 'Not set'}
+                                    </Typography>
+                                  </Box>
+                                </>
+                              )}
+                            </Paper>
+                          </Box>
+
+                          {/* Edited Ticket */}
+                          <Box sx={{ flex: 1 }}>
+                            <Paper sx={{
+                              p: 2,
+                              background: 'rgba(156, 39, 176, 0.08)',
+                              borderRadius: 2,
+                              border: '1px solid rgba(156, 39, 176, 0.2)',
+                              height: '100%'
+                            }}>
+                              <Typography variant="subtitle2" sx={{
+                                mb: 2,
+                                color: 'primary.main',
+                                display: 'flex',
+                                alignItems: 'center'
+                              }}>
+                                <AutoFixHighIcon sx={{ mr: 1, fontSize: 20 }} />
+                                AI-Edited Ticket
+                              </Typography>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Subject
+                                </Typography>
+                                <Box sx={{
+                                  ...(ticketEditData.edited.subject !== ticketEditData.actual.subject && {
+                                    background: 'rgba(156, 39, 176, 0.15)',
+                                    borderRadius: '20px',
+                                    p: 1,
+                                    pl: 2,
+                                    pr: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    border: '1px solid rgba(156, 39, 176, 0.2)',
+                                    mt: 0.5
+                                  })
+                                }}>
+                                  <Typography variant="body2">
+                                    {ticketEditData.edited.subject}
+                                  </Typography>
+                                  {ticketEditData.edited.subject !== ticketEditData.actual.subject && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+                                      <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500, mr: 0.5 }}>
+                                        Changed
+                                      </Typography>
+                                      <AutoFixHighIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Box>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Status
+                                </Typography>
+                                <Box sx={{
+                                  ...(ticketEditData.edited.status !== ticketEditData.actual.status && {
+                                    background: 'rgba(156, 39, 176, 0.15)',
+                                    borderRadius: '20px',
+                                    p: 1,
+                                    pl: 2,
+                                    pr: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    border: '1px solid rgba(156, 39, 176, 0.2)',
+                                    mt: 0.5
+                                  })
+                                }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                    <Chip
+                                      label={
+                                        ticketEditData.edited.status === 2 ? 'Open' :
+                                        ticketEditData.edited.status === 3 ? 'Pending' :
+                                        ticketEditData.edited.status === 4 ? 'Resolved' : 'Closed'
+                                      }
+                                      size="small"
+                                      sx={{
+                                        mr: 1,
+                                        background: ticketEditData.edited.status === 2 ? 'rgba(231, 76, 60, 0.15)' :
+                                                  ticketEditData.edited.status === 3 ? 'rgba(241, 196, 15, 0.15)' :
+                                                  'rgba(46, 204, 113, 0.15)',
+                                        color: 'white',
+                                        fontWeight: 500,
+                                      }}
+                                    />
+                                  </Box>
+                                  {ticketEditData.edited.status !== ticketEditData.actual.status && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500, mr: 0.5 }}>
+                                        Changed
+                                      </Typography>
+                                      <AutoFixHighIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Box>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Priority
+                                </Typography>
+                                <Box sx={{
+                                  ...(ticketEditData.edited.priority !== ticketEditData.actual.priority && {
+                                    background: 'rgba(156, 39, 176, 0.15)',
+                                    borderRadius: '20px',
+                                    p: 1,
+                                    pl: 2,
+                                    pr: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    border: '1px solid rgba(156, 39, 176, 0.2)',
+                                    mt: 0.5
+                                  })
+                                }}>
+                                  <Chip
+                                    label={
+                                      ticketEditData.edited.priority === 1 ? 'Low' :
+                                      ticketEditData.edited.priority === 2 ? 'Medium' :
+                                      ticketEditData.edited.priority === 3 ? 'High' : 'Urgent'
+                                    }
+                                    size="small"
+                                    sx={{
+                                      background: 'rgba(255,255,255,0.08)',
+                                      color: 'white',
+                                      fontWeight: 500,
+                                    }}
+                                  />
+                                  {ticketEditData.edited.priority !== ticketEditData.actual.priority && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500, mr: 0.5 }}>
+                                        Changed
+                                      </Typography>
+                                      <AutoFixHighIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Box>
+
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                  Type
+                                </Typography>
+                                <Box sx={{
+                                  ...(ticketEditData.edited.type !== ticketEditData.actual.type && {
+                                    background: 'rgba(156, 39, 176, 0.15)',
+                                    borderRadius: '20px',
+                                    p: 1,
+                                    pl: 2,
+                                    pr: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    border: '1px solid rgba(156, 39, 176, 0.2)',
+                                    mt: 0.5
+                                  })
+                                }}>
+                                  <Typography variant="body2">
+                                    {ticketEditData.edited.type || 'Not set'}
+                                  </Typography>
+                                  {ticketEditData.edited.type !== ticketEditData.actual.type && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500, mr: 0.5 }}>
+                                        Changed
+                                      </Typography>
+                                      <AutoFixHighIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                                    </Box>
+                                  )}
+                                </Box>
+                              </Box>
+
+                              {ticketEditData.edited.custom_fields && (
+                                <>
+                                  <Box sx={{ mb: 2 }}>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      Client
+                                    </Typography>
+                                    <Box sx={{
+                                      ...(ticketEditData.edited.custom_fields.cf_client !==
+                                        ticketEditData.actual.custom_fields?.cf_client && {
+                                        background: 'rgba(156, 39, 176, 0.15)',
+                                        borderRadius: '20px',
+                                        p: 1,
+                                        pl: 2,
+                                        pr: 2,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        border: '1px solid rgba(156, 39, 176, 0.2)',
+                                        mt: 0.5
+                                      })
+                                    }}>
+                                      <Typography variant="body2">
+                                        {ticketEditData.edited.custom_fields.cf_client || 'Not set'}
+                                      </Typography>
+                                      {ticketEditData.edited.custom_fields.cf_client !==
+                                        ticketEditData.actual.custom_fields?.cf_client && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500, mr: 0.5 }}>
+                                            Changed
+                                          </Typography>
+                                          <AutoFixHighIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                                        </Box>
+                                      )}
+                                    </Box>
+                                  </Box>
+
+                                  <Box sx={{ mb: 2 }}>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      Root Cause
+                                    </Typography>
+                                    <Box sx={{
+                                      ...(ticketEditData.edited.custom_fields.cf_rca !==
+                                        ticketEditData.actual.custom_fields?.cf_rca && {
+                                        background: 'rgba(156, 39, 176, 0.15)',
+                                        borderRadius: '20px',
+                                        p: 1,
+                                        pl: 2,
+                                        pr: 2,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        border: '1px solid rgba(156, 39, 176, 0.2)',
+                                        mt: 0.5
+                                      })
+                                    }}>
+                                      <Typography variant="body2" sx={{
+                                        maxHeight: '80px',
+                                        overflow: 'auto',
+                                        flex: 1,
+                                        pr: ticketEditData.edited.custom_fields.cf_rca !==
+                                          ticketEditData.actual.custom_fields?.cf_rca ? 1 : 0
+                                      }}>
+                                        {ticketEditData.edited.custom_fields.cf_rca || 'Not set'}
+                                      </Typography>
+                                      {ticketEditData.edited.custom_fields.cf_rca !==
+                                        ticketEditData.actual.custom_fields?.cf_rca && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                                          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500, mr: 0.5 }}>
+                                            Changed
+                                          </Typography>
+                                          <AutoFixHighIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                                        </Box>
+                                      )}
+                                    </Box>
+                                  </Box>
+                                </>
+                              )}
+                            </Paper>
+                          </Box>
+                        </Box>
+
+                        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                          <Button
+                            variant="outlined"
+                            onClick={() => setSelectedTicket(null)}
+                            sx={{
+                              borderColor: 'rgba(255, 255, 255, 0.2)',
+                              color: 'text.secondary',
+                              '&:hover': {
+                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                              },
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="contained"
+                            onClick={handleSubmitTicketEdit}
+                            disabled={JSON.stringify(ticketEditData.actual) === JSON.stringify(ticketEditData.edited)}
+                            startIcon={<SendIcon />}
+                            sx={{
+                              background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
+                              '&:hover': {
+                                background: 'linear-gradient(90deg, #8e24aa, #6a52b3)',
+                              },
+                              '&.Mui-disabled': {
+                                background: 'rgba(255, 255, 255, 0.12)',
+                                color: 'rgba(255, 255, 255, 0.3)',
+                              }
+                            }}
+                          >
+                            Apply Changes
+                          </Button>
+                        </Box>
+                      </>
+                    ) : (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+                        <Typography color="text.secondary">No edit data available</Typography>
+                      </Box>
+                    )}
+                  </DialogContent>
+                </>
+              )}
+            </Dialog>
+          </Box>
+        )}
+
         {activeTab === 'settings' && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <Typography variant="h5" color="text.secondary">Settings Panel</Typography>
+          </Box>
+        )}
+
+        {activeTab === 'dashboard' && (
+          <Box sx={{
+            flex: 1,
+            height: '100%',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <ApiDashboard />
           </Box>
         )}
       </Main>
@@ -1446,7 +3511,7 @@ export default function HomePage() {
             <Typography id="rca-modal-title" variant="h5" component="h2" sx={{ fontWeight: 'bold' }}>
               Root Cause Analysis
             </Typography>
-            <IconButton 
+            <IconButton
               onClick={() => setRcaModalOpen(false)}
               sx={{ color: 'white' }}
             >
@@ -1471,13 +3536,13 @@ export default function HomePage() {
                   <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
                     <BugReportIcon sx={{ mr: 1 }} /> Similar JIRA Issues
                   </Typography>
-                  
+
                   {similarJiraIssues.map((issue) => (
-                    <Paper 
-                      key={issue.issueKey} 
-                      sx={{ 
-                        p: 2, 
-                        mb: 2, 
+                    <Paper
+                      key={issue.issueKey}
+                      sx={{
+                        p: 2,
+                        mb: 2,
                         bgcolor: 'rgba(255, 255, 255, 0.05)',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: 1
@@ -1485,11 +3550,11 @@ export default function HomePage() {
                     >
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Chip 
-                            label={issue.issueKey} 
-                            sx={{ 
-                              mr: 2, 
-                              bgcolor: 'rgba(103, 58, 183, 0.2)', 
+                          <Chip
+                            label={issue.issueKey}
+                            sx={{
+                              mr: 2,
+                              bgcolor: 'rgba(103, 58, 183, 0.2)',
                               fontWeight: 'bold',
                               '& .MuiChip-label': { px: 1 }
                             }}
@@ -1501,21 +3566,21 @@ export default function HomePage() {
                             {issue.summary}
                           </Typography>
                         </Box>
-                        <Chip 
-                          label={issue.status} 
-                          size="small" 
-                          sx={{ 
-                            bgcolor: issue.status === 'Closed' ? 
+                        <Chip
+                          label={issue.status}
+                          size="small"
+                          sx={{
+                            bgcolor: issue.status === 'Closed' ?
                               'rgba(46, 204, 113, 0.2)' : 'rgba(230, 126, 34, 0.2)',
                             '& .MuiChip-label': { px: 1 }
-                          }} 
+                          }}
                         />
                       </Box>
-                      
+
                       <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
                         Type: {issue.issueType} • Similarity: {(issue.similarityScore * 100).toFixed(1)}%
                       </Typography>
-                      
+
                       {issue.extractedRCA && (
                         <Box sx={{ mt: 1, p: 1.5, bgcolor: 'rgba(52, 152, 219, 0.1)', borderRadius: 1 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
@@ -1535,7 +3600,7 @@ export default function HomePage() {
                           variant="outlined"
                           startIcon={<OpenInNewIcon />}
                           onClick={() => window.open(`https://increff.atlassian.net/browse/${issue.issueKey}`, '_blank')}
-                          sx={{ 
+                          sx={{
                             fontSize: '0.7rem',
                             borderColor: 'rgba(103, 58, 183, 0.3)',
                             color: 'rgb(103, 58, 183)',
@@ -1552,17 +3617,17 @@ export default function HomePage() {
                   ))}
                 </Box>
               )}
-              
+
               {/* Generated RCA Section */}
               {generatedRca && (
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
                     <AnalyticsIcon sx={{ mr: 1 }} /> Generated Root Cause Analysis
                   </Typography>
-                  <Paper 
-                    sx={{ 
-                      p: 3, 
-                      bgcolor: 'rgba(26, 188, 156, 0.08)', 
+                  <Paper
+                    sx={{
+                      p: 3,
+                      bgcolor: 'rgba(26, 188, 156, 0.08)',
                       border: '1px solid rgba(26, 188, 156, 0.2)',
                       borderRadius: 1
                     }}
@@ -1579,4 +3644,27 @@ export default function HomePage() {
       </Modal>
     </Box>
   );
+}
+
+// Add this component near your other component definitions
+function LoadingMessage() {
+  const messages = [
+    "Performing magic ✨",
+    "Analyzing ticket data 🔍",
+    "Applying AI rules 🧠",
+    "Finding improvements 🚀",
+    "Sprinkling AI dust 🪄"
+  ];
+
+  const [messageIndex, setMessageIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % messages.length);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return <>{messages[messageIndex]}</>;
 }
