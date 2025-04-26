@@ -23,6 +23,15 @@ import Avatar from '@mui/material/Avatar';
 import Grid from '@mui/material/Grid';
 import DiagnosticsIcon from '@mui/icons-material/FindInPage';
 import Button from '@mui/material/Button';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import Tooltip from '@mui/material/Tooltip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Modal from '@mui/material/Modal';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import CloseIcon from '@mui/icons-material/Close';
+import ArticleIcon from '@mui/icons-material/Article';
+import LinkIcon from '@mui/icons-material/Link';
 
 const drawerWidth = 340;
 
@@ -170,10 +179,10 @@ const StatusBox = styled(Paper, {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  height: '150px',
-  width: '200px',
-  padding: theme.spacing(2),
-  margin: theme.spacing(2),
+  height: '120px',
+  width: '160px',
+  padding: theme.spacing(1.5),
+  margin: theme.spacing(1.5),
   borderRadius: theme.spacing(2),
   boxShadow: status === 'success' 
     ? `0 0 15px rgba(46, 204, 113, 0.5), inset 0 0 20px rgba(46, 204, 113, 0.3)` 
@@ -211,6 +220,47 @@ const DiagnosticsContainer = styled(Box)(({ theme }) => ({
   maxWidth: '900px',
   width: '100%',
   position: 'relative',
+}));
+
+// Styled component for API logs list
+const ApiLogsList = styled(Paper)(({ theme }) => ({
+  width: '100%',
+  maxWidth: '900px',
+  marginTop: theme.spacing(4),
+  backgroundColor: 'rgba(30, 30, 40, 0.6)',
+  borderRadius: theme.spacing(1),
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+  padding: theme.spacing(2),
+  display: 'flex',
+  flexDirection: 'column',
+  maxHeight: '600px',
+  transition: 'max-width 0.3s ease',
+}));
+
+// Styled component for API log details
+const ApiLogDetails = styled(Paper)(({ theme }) => ({
+  width: '100%',
+  maxWidth: '530px',
+  marginTop: theme.spacing(4),
+  marginLeft: theme.spacing(2),
+  backgroundColor: 'rgba(30, 30, 40, 0.6)',
+  borderRadius: theme.spacing(1),
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+  padding: theme.spacing(2),
+  display: 'flex',
+  flexDirection: 'column',
+  maxHeight: '600px',
+  '&::-webkit-scrollbar': {
+    width: '8px',
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: '4px',
+  },
+  '&::-webkit-scrollbar-track': {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: '4px',
+  }
 }));
 
 const DiagnosticsRow = styled(Box)(({ theme }) => ({
@@ -322,6 +372,43 @@ interface SystemStatus {
   callCount: number;
 }
 
+interface JiraIssue {
+  issueKey: string;
+  summary: string;
+  description: string;
+  extractedRCA: string | null;
+  status: string;
+  issueType: string;
+  similarityScore: number;
+}
+
+interface SearchResponse {
+  status: string;
+  code: number;
+  message: string;
+  data: {
+    query: string;
+    totalResults: number;
+    results: JiraIssue[];
+  };
+}
+
+interface RcaResponse {
+  status: string;
+  code: number;
+  message: string;
+  data: {
+    query: string;
+    rca: string;
+    issuesUsed: {
+      issueKey: string;
+      summary: string;
+      similarityScore: number;
+    }[];
+    totalIssuesUsed: number;
+  };
+}
+
 export default function HomePage() {
   const [message, setMessage] = useState('');
   const [conversation, setConversation] = useState<string[]>([]);
@@ -333,6 +420,19 @@ export default function HomePage() {
   const [systemsData, setSystemsData] = useState<SystemStatus[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Add state for API logs
+  const [apiLogs, setApiLogs] = useState<Record<string, ApiCallLog[]>>({});
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<ApiCallLog | null>(null);
+  const [isOpeningLog, setIsOpeningLog] = useState(false);
+  
+  // Add state for RCA modal
+  const [rcaModalOpen, setRcaModalOpen] = useState(false);
+  const [similarJiraIssues, setSimilarJiraIssues] = useState<JiraIssue[]>([]);
+  const [generatedRca, setGeneratedRca] = useState<string>('');
+  const [isLoadingRca, setIsLoadingRca] = useState(false);
+  const [rcaError, setRcaError] = useState<string | null>(null);
   
   // Use the typing effect hook
   const { displayedText, isTyping } = useTypingEffect('Hi, Avishek Chatterjee', 70);
@@ -388,6 +488,13 @@ export default function HomePage() {
         failedSystem.status = 'failure';
       }
     }
+
+    // Store the API logs
+    setApiLogs({
+      OMS: data.oms,
+      CIMS: data.cims,
+      WMS: data.wms
+    });
     
     return systemStatuses;
   };
@@ -418,6 +525,60 @@ export default function HomePage() {
     setActiveTab(tabName);
   };
 
+  // Handle component click to show logs
+  const handleComponentClick = (componentName: string) => {
+    const logs = apiLogs[componentName];
+    if (logs && logs.length > 0) {
+      setSelectedComponent(componentName);
+      setSelectedLog(null);
+    }
+  };
+
+  // Handle log click to show details
+  const handleLogClick = (log: ApiCallLog) => {
+    setSelectedLog(log);
+  };
+
+  // Update the StatusBox component to be clickable when it has logs
+  const renderStatusBox = (system: SystemStatus) => {
+    const hasLogs = system.callCount > 0;
+    
+    return (
+      <StatusBox 
+        status={system.status} 
+        onClick={() => hasLogs && handleComponentClick(system.name)}
+        sx={{ cursor: hasLogs ? 'pointer' : 'default' }}
+      >
+        <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
+          {system.name}
+        </Typography>
+        <Typography variant="body1" sx={{ 
+          color: 
+            system.status === 'success' ? 'rgb(46, 204, 113)' : 
+            system.status === 'failure' ? 'rgb(231, 76, 60)' : 
+            'rgb(149, 165, 166)',
+          fontWeight: 'bold'
+        }}>
+          {system.status === 'success' ? 'Success' : 
+           system.status === 'failure' ? 'Failed' : 
+           'No Calls'}
+        </Typography>
+        {system.callCount > 0 && (
+          <Chip 
+            label={`${system.callCount} calls`} 
+            size="small" 
+            sx={{ 
+              mt: 1, 
+              background: 'rgba(255, 255, 255, 0.1)', 
+              color: 'text.secondary',
+              fontSize: '0.7rem'
+            }} 
+          />
+        )}
+      </StatusBox>
+    );
+  };
+
   // Function to handle trace ID submission
   const handleTraceIdSubmit = async () => {
     if (traceId.trim()) {
@@ -425,62 +586,29 @@ export default function HomePage() {
       setError(null);
       
       try {
-        // In a real implementation, we would make an API call here
-        // For now, simulate the API call with a timeout
-        setTimeout(() => {
-          // Mock API call - this would be replaced with an actual fetch call
-          // Example: const response = await fetch('/api/trace/' + traceId);
-          //          const data = await response.json();
-          
-          // For demonstration, we'll use the example data provided
-          const exampleResponse: TraceResponse = {
-            trace_id: "917df85e-e3ee-4481-8d4c-ea9b258c1f65",
-            count: 39,
-            summary: {
-              oms_count: 39,
-              cims_count: 0,
-              wms_count: 0
-            },
-            latestFailureCall: {
-              _id: "zQRUbpYB3rARF5bqxB4g",
-              _index: "oms-inbound-2025-04-25",
-              component: "oms",
-              application: "oms-inbound",
-              module: "ORDER_MANAGEMENT_SYSTEM",
-              client: "1200061523",
-              host: "staging-styli-omni",
-              timestamp: "2025-04-25T19:02:49.892",
-              url: "http://localhost:8080/oms/orders/outward/sub-orders/452?sync=false",
-              http_method: "GET",
-              http_status: "500",
-              status: "FAILURE",
-              duration_millis: 1084,
-              request_name: "GET_SUB_ORDER",
-              end_timestamp: "2025-04-25T19:02:50.976",
-              requestBody: "",
-              responseBody: "{\"code\":\"UNKNOWN_ERROR\",\"message\":\"Internal Error in OMS\",\"description\":null,\"errors\":[]}",
-              http_headers: ""
-            },
-            oms: Array(39).fill({
-              _id: "sample-id",
-              component: "oms",
-              application: "oms-application",
-              http_status: "200",
-              status: "SUCCESS",
-              url: "http://example.com"
-            }),
-            cims: [],
-            wms: []
-          };
-          
-          // Process the response
-          const processedSystems = processApiResponse(exampleResponse);
+        // Make real API call to the provided endpoint
+        const response = await fetch(`http://127.0.0.1:3005/api/trace?traceId=${traceId}`);
+        
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`);
+        }
+        
+        const data: TraceResponse = await response.json();
+        
+        // Check if all components have empty data
+        if (data.oms.length === 0 && data.cims.length === 0 && data.wms.length === 0) {
+          setError("No trace data found for the provided trace ID. Please verify the ID and try again.");
+          setSystemsData(null);
+        } else {
+          // Process the API response data
+          const processedSystems = processApiResponse(data);
           setSystemsData(processedSystems);
-          setIsLoading(false);
-        }, 1500);
+        }
       } catch (err) {
         console.error("Error fetching trace data:", err);
-        setError("Failed to fetch trace data. Please try again.");
+        setError(err instanceof Error ? err.message : "Failed to fetch trace data. Please try again.");
+        setSystemsData(null);
+      } finally {
         setIsLoading(false);
       }
     }
@@ -491,6 +619,107 @@ export default function HomePage() {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleTraceIdSubmit();
+    }
+  };
+
+  // Function to open log in a new tab
+  const handleOpenLogDocument = async (logId: string) => {
+    if (isOpeningLog) return;
+    
+    setIsOpeningLog(true);
+    try {
+      const response = await fetch(`http://127.0.0.1:3005/api/log?id=${logId}`);
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        console.error('No URL returned from API');
+      }
+    } catch (err) {
+      console.error('Error fetching log document URL:', err);
+    } finally {
+      setIsOpeningLog(false);
+    }
+  };
+
+  // Function to handle RCA button click
+  const handleRcaButtonClick = async () => {
+    if (!selectedLog?.responseBody) return;
+    
+    setRcaModalOpen(true);
+    setIsLoadingRca(true);
+    setRcaError(null);
+    setSimilarJiraIssues([]);
+    setGeneratedRca('');
+    
+    try {
+      //console.log(selectedLog.responseBody);
+      
+      // Pre-process JSON string to handle NaN values before parsing
+      const processedJsonString = selectedLog.responseBody
+        .replace(/:NaN,/g, ':null,')
+        .replace(/:NaN}/g, ':null}');
+      
+      let query = "";
+      try {
+        const responseJson = JSON.parse(processedJsonString);
+        query = responseJson.message || responseJson.responseBody?.substring(0, 100) || selectedLog.responseBody.substring(0, 100);
+      } catch (parseError) {
+        console.warn("Failed to parse response JSON, using raw text:", parseError);
+        query = selectedLog.responseBody.substring(0, 100);
+      }
+      
+      console.log(query);
+      
+      // Call first API to get similar JIRA issues
+      const similarIssuesResponse = await fetch('http://127.0.0.1:5001/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query,
+          limit: 3
+        })
+      });
+      
+      if (!similarIssuesResponse.ok) {
+        throw new Error(`Error fetching similar issues: ${similarIssuesResponse.status}`);
+      }
+
+      const similarIssuesData: SearchResponse = await similarIssuesResponse.json();
+      setSimilarJiraIssues(similarIssuesData.data.results);
+      
+      // Call second API to get generated RCA
+      const rcaResponse = await fetch('http://127.0.0.1:5001/api/generate-rca', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query,
+          limit: 3
+        })
+      });
+
+      if (!rcaResponse.ok) {
+        throw new Error(`Error generating RCA: ${rcaResponse.status}`);
+      }
+      
+      const rcaData: RcaResponse = await rcaResponse.json();
+      setGeneratedRca(rcaData.data.rca);
+      
+    } catch (err) {
+      console.error('Error in RCA process:', err);
+      setRcaError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setIsLoadingRca(false);
     }
   };
 
@@ -679,11 +908,12 @@ export default function HomePage() {
             justifyContent: 'flex-start',
             alignItems: 'center',
             p: 2,
+            pt: 1,
             position: 'relative'
           }}>
             <Typography variant="h4" sx={{ 
-              mb: 6, 
-              mt: 2,
+              mb: 4, 
+              mt: 1,
               color: '#fff',
               background: 'linear-gradient(90deg, #9c27b0, #7e57c2)',
               backgroundClip: 'text',
@@ -793,7 +1023,7 @@ export default function HomePage() {
                 )}
               </Box>
             ) : (
-              <Box sx={{ width: '100%', maxWidth: '1000px' }}>
+              <Box sx={{ width: '100%', maxWidth: '1000px', mt: -1 }}>
                 {/* API Call Summary */}
                 <Box 
                   sx={{ 
@@ -854,7 +1084,7 @@ export default function HomePage() {
                 </Box>
                 
                 <DiagnosticsContainer>
-                  <DiagnosticsRow sx={{ position: 'relative' }}>
+                  <DiagnosticsRow sx={{ position: 'relative', mt: -1 }}>
                     {['WMS', 'OMS', 'CIMS', 'Proxy', 'RMS'].map((name, index) => {
                       const system = systemsData.find(s => s.name === name);
                       if (!system) return null;
@@ -867,37 +1097,11 @@ export default function HomePage() {
                           sx={{ position: 'relative', zIndex: 1 }} 
                           id={isProxy ? 'proxy-component' : undefined}
                         >
-                          <StatusBox status={system.status}>
-                            <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
-                              {system.name}
-                            </Typography>
-                            <Typography variant="body1" sx={{ 
-                              color: 
-                                system.status === 'success' ? 'rgb(46, 204, 113)' : 
-                                system.status === 'failure' ? 'rgb(231, 76, 60)' : 
-                                'rgb(149, 165, 166)',
-                              fontWeight: 'bold'
-                            }}>
-                              {system.status === 'success' ? 'Success' : 
-                               system.status === 'failure' ? 'Failed' : 
-                               'No Calls'}
-                            </Typography>
-                            {system.callCount > 0 && (
-                              <Chip 
-                                label={`${system.callCount} calls`} 
-                                size="small" 
-                                sx={{ 
-                                  mt: 1, 
-                                  background: 'rgba(255, 255, 255, 0.1)', 
-                                  color: 'text.secondary',
-                                  fontSize: '0.7rem'
-                                }} 
-                              />
-                            )}
-                          </StatusBox>
+                          {renderStatusBox(system)}
                           
                           {index < 4 && (
                             <HorizontalConnector 
+                              key={`connector-${name}`}
                               sx={{ 
                                 position: 'absolute', 
                                 top: '75px', 
@@ -909,6 +1113,7 @@ export default function HomePage() {
                           {/* Add vertical connector from Proxy */}
                           {isProxy && (
                             <Box 
+                              key={`vertical-connector-${name}`}
                               sx={{ 
                                 position: 'absolute',
                                 top: '150px',
@@ -931,38 +1136,266 @@ export default function HomePage() {
                     justifyContent: 'center', 
                     position: 'relative', 
                     mt: '0px', 
-                    ml: '402px', /* Adjusted to align with Proxy */
+                    ml: '322px', /* Adjusted to align with Proxy after making boxes smaller */
                     zIndex: 1
                   }}>
-                    <StatusBox status={systemsData.find(s => s.name === 'Channel')?.status || 'inactive'}>
-                      <Typography variant="h5" sx={{ mb: 1, fontWeight: 500 }}>
-                        Channel
-                      </Typography>
-                      <Typography variant="body1" sx={{ 
-                        color: 
-                          systemsData.find(s => s.name === 'Channel')?.status === 'success' ? 'rgb(46, 204, 113)' : 
-                          systemsData.find(s => s.name === 'Channel')?.status === 'failure' ? 'rgb(231, 76, 60)' : 
-                          'rgb(149, 165, 166)',
-                        fontWeight: 'bold'
-                      }}>
-                        {systemsData.find(s => s.name === 'Channel')?.status === 'success' ? 'Success' : 
-                         systemsData.find(s => s.name === 'Channel')?.status === 'failure' ? 'Failed' : 
-                         'No Calls'}
-                      </Typography>
-                      {(systemsData.find(s => s.name === 'Channel')?.callCount || 0) > 0 && (
-                        <Chip 
-                          label={`${systemsData.find(s => s.name === 'Channel')?.callCount || 0} calls`} 
-                          size="small" 
-                          sx={{ 
-                            mt: 1, 
-                            background: 'rgba(255, 255, 255, 0.1)', 
-                            color: 'text.secondary',
-                            fontSize: '0.7rem'
-                          }} 
-                        />
-                      )}
-                    </StatusBox>
+                    {renderStatusBox(systemsData.find(s => s.name === 'Channel') || { 
+                      name: 'Channel', 
+                      status: 'inactive', 
+                      callCount: 0 
+                    })}
                   </Box>
+
+                  {/* API Logs list and details side by side */}
+                  {selectedComponent && apiLogs[selectedComponent]?.length > 0 && (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'row',
+                      width: '100%',
+                      maxWidth: '900px',
+                      flexWrap: 'wrap',
+                      gap: { xs: 2, md: 0 },
+                      height: '500px',
+                      mt: 1,
+                      mb: 5,
+                      pb: 2
+                    }}>
+                      <ApiLogsList sx={{ 
+                        maxWidth: selectedLog ? '350px' : '900px', 
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}>
+                        <Typography variant="h6" sx={{ mb: 2, flexShrink: 0 }}>
+                          {selectedComponent} API Call Logs ({apiLogs[selectedComponent].length})
+                        </Typography>
+                        <Box sx={{ 
+                          overflowY: 'auto', 
+                          flex: '1 1 auto',
+                          '&::-webkit-scrollbar': {
+                            width: '8px',
+                          },
+                          '&::-webkit-scrollbar-thumb': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)', 
+                            borderRadius: '4px'
+                          },
+                          '&::-webkit-scrollbar-track': {
+                            backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                            borderRadius: '4px'
+                          }
+                        }}>
+                          <List>
+                            {apiLogs[selectedComponent].map((log) => (
+                              <ListItem 
+                                key={log._id} 
+                                onClick={() => handleLogClick(log)} 
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  borderLeft: `4px solid ${log.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}`,
+                                  mb: 1,
+                                  backgroundColor: selectedLog?._id === log._id ? 'rgba(156, 39, 176, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                                  borderRadius: '0 4px 4px 0',
+                                  '&:hover': {
+                                    backgroundColor: selectedLog?._id === log._id ? 'rgba(156, 39, 176, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                                  }
+                                }}
+                              >
+                                <ListItemText
+                                  primary={
+                                    <Typography 
+                                      color={log.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}
+                                      sx={{ fontWeight: 'bold' }}
+                                    >
+                                      {log.request_name || log.url.split('/').pop() || 'API Call'}
+                                    </Typography>
+                                  }
+                                  secondary={
+                                    <>
+                                      <Typography component="span" variant="body2" sx={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {log.http_method} {log.url}
+                                      </Typography>
+                                      <Typography component="span" variant="body2" sx={{ display: 'block' }}>
+                                        Status: {log.http_status} • {log.duration_millis}ms
+                                      </Typography>
+                                    </>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Box>
+                      </ApiLogsList>
+
+                      {/* API Log Details */}
+                      {selectedLog && (
+                        <ApiLogDetails sx={{ 
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          overflowY: 'auto'
+                        }}>
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            mb: 1,
+                            flexShrink: 0
+                          }}>
+                            <Typography variant="h6">API Call Details</Typography>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              {selectedLog && selectedLog.status !== 'SUCCESS' && (
+                                <Tooltip title="Analyze Root Cause">
+                                  <IconButton 
+                                    size="small"
+                                    color="primary"
+                                    onClick={handleRcaButtonClick}
+                                    sx={{
+                                      backgroundColor: 'rgba(231, 76, 60, 0.15)',
+                                      '&:hover': {
+                                        backgroundColor: 'rgba(231, 76, 60, 0.25)'
+                                      }
+                                    }}
+                                  >
+                                    <AnalyticsIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              <Tooltip title="Open log document in new tab">
+                                <div>
+                                  <IconButton 
+                                    size="small"
+                                    color="primary"
+                                    onClick={() => handleOpenLogDocument(selectedLog._id)}
+                                    disabled={isOpeningLog}
+                                    sx={{
+                                      backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                                      '&:hover': {
+                                        backgroundColor: 'rgba(156, 39, 176, 0.2)'
+                                      }
+                                    }}
+                                  >
+                                    {isOpeningLog ? 
+                                      <CircularProgress size={20} color="inherit" /> : 
+                                      <OpenInNewIcon fontSize="small" />
+                                    }
+                                  </IconButton>
+                                </div>
+                              </Tooltip>
+                            </Box>
+                          </Box>
+                          
+                          <Box sx={{ 
+                            display: 'flex', 
+                            flexWrap: 'wrap', 
+                            gap: 1.5, 
+                            overflowY: 'auto',
+                            flex: '1 1 auto',
+                            pr: 1
+                          }}>
+                            <Box sx={{ flex: '1 1 45%', minWidth: '200px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">ID</Typography>
+                              <Tooltip title={selectedLog._id}>
+                                <Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedLog._id}</Typography>
+                              </Tooltip>
+                            </Box>
+                            <Box sx={{ flex: '1 1 45%', minWidth: '200px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                              <Typography 
+                                color={selectedLog.status === 'SUCCESS' ? 'rgb(46, 204, 113)' : 'rgb(231, 76, 60)'}
+                                sx={{ fontWeight: 'bold' }}
+                              >
+                                {selectedLog.status} ({selectedLog.http_status})
+                              </Typography>
+                            </Box>
+                            <Box sx={{ flex: '1 1 100%' }}>
+                              <Typography variant="subtitle2" color="text.secondary">URL</Typography>
+                              <Tooltip title={`${selectedLog.http_method} ${selectedLog.url}`}>
+                                <Typography sx={{ wordBreak: 'break-all' }}>{selectedLog.http_method} {selectedLog.url}</Typography>
+                              </Tooltip>
+                            </Box>
+                            <Box sx={{ flex: '1 1 31%', minWidth: '150px', maxWidth: '250px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Request Name</Typography>
+                              <Tooltip title={selectedLog.request_name || 'N/A'}>
+                                <Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedLog.request_name || 'N/A'}</Typography>
+                              </Tooltip>
+                            </Box>
+                            <Box sx={{ flex: '0 1 31%', minWidth: '120px', maxWidth: '150px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Duration</Typography>
+                              <Tooltip title={`${selectedLog.duration_millis}ms`}>
+                                <Typography noWrap>{selectedLog.duration_millis}ms</Typography>
+                              </Tooltip>
+                            </Box>
+                            <Box sx={{ flex: '1 1 31%', minWidth: '150px' }}>
+                              <Typography variant="subtitle2" color="text.secondary">Timestamp</Typography>
+                              <Tooltip title={new Date(selectedLog.timestamp || '').toLocaleString()}>
+                                <Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{new Date(selectedLog.timestamp || '').toLocaleString()}</Typography>
+                              </Tooltip>
+                            </Box>
+                            
+                            {selectedLog.requestBody && (
+                              <Box sx={{ flex: '1 1 100%' }}>
+                                <Typography variant="subtitle2" color="text.secondary">Request Body</Typography>
+                                <Paper 
+                                  sx={{ 
+                                    p: 1.5, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', 
+                                    maxHeight: '120px', 
+                                    overflow: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.85rem',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all'
+                                  }}
+                                >
+                                  {selectedLog.requestBody}
+                                </Paper>
+                              </Box>
+                            )}
+                            
+                            {selectedLog.responseBody && (
+                              <Box sx={{ flex: '1 1 100%' }}>
+                                <Typography variant="subtitle2" color="text.secondary">Response Body</Typography>
+                                <Paper 
+                                  sx={{ 
+                                    p: 1.5, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', 
+                                    maxHeight: '120px', 
+                                    overflow: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.85rem',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all'
+                                  }}
+                                >
+                                  {selectedLog.responseBody}
+                                </Paper>
+                              </Box>
+                            )}
+                            
+                            {selectedLog.http_headers && (
+                              <Box sx={{ flex: '1 1 100%' }}>
+                                <Typography variant="subtitle2" color="text.secondary">HTTP Headers</Typography>
+                                <Paper 
+                                  sx={{ 
+                                    p: 1.5, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', 
+                                    maxHeight: '120px', 
+                                    overflow: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.85rem',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all'
+                                  }}
+                                >
+                                  {selectedLog.http_headers}
+                                </Paper>
+                              </Box>
+                            )}
+                          </Box>
+                        </ApiLogDetails>
+                      )}
+                    </Box>
+                  )}
                 </DiagnosticsContainer>
               </Box>
             )}
@@ -975,6 +1408,175 @@ export default function HomePage() {
           </Box>
         )}
       </Main>
+
+      {/* Add the RCA Modal */}
+      <Modal
+        open={rcaModalOpen}
+        onClose={() => setRcaModalOpen(false)}
+        aria-labelledby="rca-modal-title"
+        aria-describedby="rca-modal-description"
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '80%',
+          maxWidth: 900,
+          maxHeight: '90vh',
+          bgcolor: 'rgba(30, 30, 40, 0.95)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: 2,
+          boxShadow: 24,
+          p: 4,
+          overflow: 'auto',
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: '4px',
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: 'rgba(0, 0, 0, 0.1)',
+            borderRadius: '4px',
+          }
+        }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography id="rca-modal-title" variant="h5" component="h2" sx={{ fontWeight: 'bold' }}>
+              Root Cause Analysis
+            </Typography>
+            <IconButton 
+              onClick={() => setRcaModalOpen(false)}
+              sx={{ color: 'white' }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+
+          {isLoadingRca ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', my: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Analyzing and generating RCA...</Typography>
+            </Box>
+          ) : rcaError ? (
+            <Paper sx={{ p: 2, bgcolor: 'rgba(231, 76, 60, 0.1)', color: 'rgb(231, 76, 60)', mb: 3 }}>
+              <Typography>{rcaError}</Typography>
+            </Paper>
+          ) : (
+            <>
+              {/* Similar JIRA Issues Section */}
+              {similarJiraIssues.length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <BugReportIcon sx={{ mr: 1 }} /> Similar JIRA Issues
+                  </Typography>
+                  
+                  {similarJiraIssues.map((issue) => (
+                    <Paper 
+                      key={issue.issueKey} 
+                      sx={{ 
+                        p: 2, 
+                        mb: 2, 
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Chip 
+                            label={issue.issueKey} 
+                            sx={{ 
+                              mr: 2, 
+                              bgcolor: 'rgba(103, 58, 183, 0.2)', 
+                              fontWeight: 'bold',
+                              '& .MuiChip-label': { px: 1 }
+                            }}
+                            onClick={() => window.open(`https://increff.atlassian.net/browse/${issue.issueKey}`, '_blank')}
+                            icon={<LinkIcon style={{ fontSize: '14px' }} />}
+                            clickable
+                          />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                            {issue.summary}
+                          </Typography>
+                        </Box>
+                        <Chip 
+                          label={issue.status} 
+                          size="small" 
+                          sx={{ 
+                            bgcolor: issue.status === 'Closed' ? 
+                              'rgba(46, 204, 113, 0.2)' : 'rgba(230, 126, 34, 0.2)',
+                            '& .MuiChip-label': { px: 1 }
+                          }} 
+                        />
+                      </Box>
+                      
+                      <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+                        Type: {issue.issueType} • Similarity: {(issue.similarityScore * 100).toFixed(1)}%
+                      </Typography>
+                      
+                      {issue.extractedRCA && (
+                        <Box sx={{ mt: 1, p: 1.5, bgcolor: 'rgba(52, 152, 219, 0.1)', borderRadius: 1 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                            <ArticleIcon sx={{ fontSize: 16, mr: 0.5, verticalAlign: 'text-top' }} />
+                            Extracted RCA:
+                          </Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                            {issue.extractedRCA}
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {/* Add Link icon button for mobile/touch devices */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, justifyContent: 'flex-end' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<OpenInNewIcon />}
+                          onClick={() => window.open(`https://increff.atlassian.net/browse/${issue.issueKey}`, '_blank')}
+                          sx={{ 
+                            fontSize: '0.7rem',
+                            borderColor: 'rgba(103, 58, 183, 0.3)',
+                            color: 'rgb(103, 58, 183)',
+                            '&:hover': {
+                              borderColor: 'rgba(103, 58, 183, 0.8)',
+                              backgroundColor: 'rgba(103, 58, 183, 0.08)'
+                            }
+                          }}
+                        >
+                          Open in JIRA
+                        </Button>
+                      </Box>
+                    </Paper>
+                  ))}
+                </Box>
+              )}
+              
+              {/* Generated RCA Section */}
+              {generatedRca && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                    <AnalyticsIcon sx={{ mr: 1 }} /> Generated Root Cause Analysis
+                  </Typography>
+                  <Paper 
+                    sx={{ 
+                      p: 3, 
+                      bgcolor: 'rgba(26, 188, 156, 0.08)', 
+                      border: '1px solid rgba(26, 188, 156, 0.2)',
+                      borderRadius: 1
+                    }}
+                  >
+                    <Typography sx={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}>
+                      {generatedRca}
+                    </Typography>
+                  </Paper>
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
+      </Modal>
     </Box>
   );
 }
