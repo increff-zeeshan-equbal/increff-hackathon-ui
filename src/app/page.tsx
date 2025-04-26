@@ -43,6 +43,11 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import ApiDashboard from '../components/ApiDashboard';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer } from 'recharts';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const drawerWidth = 340;
 
@@ -183,44 +188,34 @@ const PromptChip = styled(Chip)(({ theme }) => ({
   height: 'auto',
 }));
 
-const StatusBox = styled(Paper, { 
-  shouldForwardProp: (prop) => prop !== 'status' 
-})<{ status?: 'success' | 'failure' | 'inactive' }>(({ theme, status }) => ({
+const StatusBox = styled(Box)<{ status: string }>(({ theme, status }) => ({
+  width: '100%',
+  minWidth: 180,
+  padding: theme.spacing(2.5),
+  borderRadius: theme.spacing(2),
+  background: 'rgba(18, 18, 30, 0.7)',
+  border: '1px solid',
+  borderColor: 
+    status === 'success' ? 'rgba(46, 204, 113, 0.3)' : 
+    status === 'failure' ? 'rgba(231, 76, 60, 0.3)' : 
+    'rgba(255, 255, 255, 0.08)',
+  boxShadow: 
+    status === 'success' ? '0 4px 12px rgba(46, 204, 113, 0.15)' : 
+    status === 'failure' ? '0 4px 12px rgba(231, 76, 60, 0.15)' : 
+    '0 4px 12px rgba(0, 0, 0, 0.1)',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  height: '150px',
-  width: '200px',
-  padding: theme.spacing(2),
-  margin: theme.spacing(2),
-  borderRadius: theme.spacing(2),
-  boxShadow: status === 'success' 
-    ? `0 0 15px rgba(46, 204, 113, 0.5), inset 0 0 20px rgba(46, 204, 113, 0.3)` 
-    : status === 'failure'
-      ? `0 0 15px rgba(231, 76, 60, 0.5), inset 0 0 20px rgba(231, 76, 60, 0.3)`
-      : `0 0 15px rgba(149, 165, 166, 0.5), inset 0 0 20px rgba(149, 165, 166, 0.3)`,
-  background: status === 'success' 
-    ? 'rgba(46, 204, 113, 0.15)' 
-    : status === 'failure'
-      ? 'rgba(231, 76, 60, 0.15)'
-      : 'rgba(149, 165, 166, 0.15)',
-  border: `1px solid ${
-    status === 'success' 
-      ? 'rgba(46, 204, 113, 0.5)' 
-      : status === 'failure'
-        ? 'rgba(231, 76, 60, 0.5)'
-        : 'rgba(149, 165, 166, 0.5)'
-  }`,
-  transition: 'all 0.3s ease',
+  textAlign: 'center',
+  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
   '&:hover': {
-    transform: 'translateY(-5px)',
-    boxShadow: status === 'success' 
-      ? `0 5px 20px rgba(46, 204, 113, 0.6), inset 0 0 20px rgba(46, 204, 113, 0.4)` 
-      : status === 'failure'
-        ? `0 5px 20px rgba(231, 76, 60, 0.6), inset 0 0 20px rgba(231, 76, 60, 0.4)`
-        : `0 5px 20px rgba(149, 165, 166, 0.6), inset 0 0 20px rgba(149, 165, 166, 0.4)`,
-  }
+    transform: 'translateY(-4px)',
+    boxShadow: 
+      status === 'success' ? '0 8px 24px rgba(46, 204, 113, 0.2)' : 
+      status === 'failure' ? '0 8px 24px rgba(231, 76, 60, 0.2)' : 
+      '0 8px 24px rgba(0, 0, 0, 0.15)',
+  },
 }));
 
 const DiagnosticsContainer = styled(Box)(({ theme }) => ({
@@ -826,7 +821,8 @@ function JiraRcaAnalysis() {
               boxShadow: '0 4px 16px rgba(156,39,176,0.08)',
               border: '1px solid rgba(255,255,255,0.08)',
               color: '#fff',
-              height: 260,
+              height: 'auto', // Changed from fixed height to auto
+              minHeight: 260, // Added minimum height
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -1243,7 +1239,7 @@ function JiraRcaAnalysis() {
 export default function HomePage() {
   const [message, setMessage] = useState('');
   const [conversation, setConversation] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const hasConversation = conversation.length > 0;
   
   // Add state for diagnostics
@@ -1542,17 +1538,8 @@ export default function HomePage() {
       const text = "Welcome to AI Support Assistant";
       let currentIndex = 0;
       
-      const typingInterval = setInterval(() => {
-        if (currentIndex <= text.length) {
-          setDisplayedText(text.substring(0, currentIndex));
-          currentIndex++;
-        } else {
-          clearInterval(typingInterval);
-          setIsTyping(false);
-        }
-      }, 100);
-      
-      return () => clearInterval(typingInterval);
+      // Remove this useEffect since you're already using the useTypingEffect hook
+      // The custom hook already handles the typing animation
     }
   }, [hasConversation]);
 
@@ -1560,22 +1547,22 @@ export default function HomePage() {
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%)' }}>
       {/* Sidebar */}
       <StyledDrawer>
-        <Box sx={{ p: 2, pt: 3 }}>
-          <NewChatButton>
-            <ListItemIcon sx={{ color: 'white', minWidth: 36 }}>
-              <AddIcon />
-            </ListItemIcon>
-            <ListItemText primary="New Chat" primaryTypographyProps={{ fontWeight: 'medium' }} />
-          </NewChatButton>
-        </Box>
-        <Divider sx={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }} />
         <List sx={{ px: 1, flexGrow: 1 }}>
           {[
-            { text: 'Recent Chats', icon: <ChatIcon />, id: 'chat' },
+            { text: 'API Dashboard', icon: <DashboardIcon />, id: 'dashboard' },
             { text: 'API Diagnostics', icon: <DiagnosticsIcon />, id: 'diagnostics' },
             { text: 'Jira RCA Analysis', icon: <BugReportIcon />, id: 'jira' },
             { text: 'Freshdesk Fixer', icon: <SupportIcon />, id: 'freshdesk' },
-            { text: 'Settings', icon: <SettingsIcon />, id: 'settings' }
+            // Recent Chats moved to the bottom with vision tag
+            { 
+              text: 'Recent Chats', 
+              icon: <ChatIcon />, 
+              id: 'chat',
+              tag: { 
+                text: 'Vision', 
+                icon: <VisibilityIcon style={{ fontSize: 14 }} /> 
+              }
+            }
           ].map((item) => (
             <ListItem key={item.text} disablePadding>
               <ListItemButton 
@@ -1594,6 +1581,23 @@ export default function HomePage() {
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText primary={item.text} />
+                
+                {/* Add Vision tag if present */}
+                {item.tag && (
+                  <Chip 
+                    label={item.tag.text}
+                    size="small"
+                    icon={item.tag.icon}
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.7rem',
+                      backgroundColor: 'rgba(156, 39, 176, 0.15)',
+                      color: '#9c27b0',
+                      '& .MuiChip-icon': { color: '#9c27b0' },
+                      ml: 1
+                    }} 
+                  />
+                )}
               </ListItemButton>
             </ListItem>
           ))}
@@ -1857,7 +1861,7 @@ export default function HomePage() {
                 )}
               </Box>
             ) : (
-              <Box sx={{ width: '100%', maxWidth: '1000px' }}>
+              <Box sx={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
                 {/* API Call Summary */}
                 <Box 
                   sx={{ 
@@ -1917,8 +1921,18 @@ export default function HomePage() {
                   </Button>
                 </Box>
                 
-                <DiagnosticsContainer>
-                  <DiagnosticsRow sx={{ position: 'relative' }}>
+                <DiagnosticsContainer sx={{ 
+                  width: '100%', 
+                  maxWidth: '1200px', // Increased max width
+                  margin: '0 auto' // Center the container
+                }}>
+                  <DiagnosticsRow sx={{ 
+                    position: 'relative',
+                    display: 'flex',
+                    justifyContent: 'space-between', // Ensure even spacing
+                    flexWrap: { xs: 'wrap', md: 'nowrap' }, // Allow wrapping on small screens
+                    gap: 2 // Add gap between items
+                  }}>
                     {['WMS', 'OMS', 'CIMS', 'Proxy', 'RMS'].map((name, index) => {
                       const system = systemsData.find(s => s.name === name);
                       if (!system) return null;
@@ -2187,7 +2201,8 @@ export default function HomePage() {
                       boxShadow: '0 4px 16px rgba(156,39,176,0.08)',
                       border: '1px solid rgba(255,255,255,0.08)',
                       color: '#fff',
-                      height: 260,
+                      height: 'auto', // Changed from fixed height to auto
+                      minHeight: 260, // Added minimum height
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
@@ -2985,6 +3000,18 @@ export default function HomePage() {
         {activeTab === 'settings' && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <Typography variant="h5" color="text.secondary">Settings Panel</Typography>
+          </Box>
+        )}
+
+        {activeTab === 'dashboard' && (
+          <Box sx={{ 
+            flex: 1, 
+            height: '100%', 
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <ApiDashboard />
           </Box>
         )}
       </Main>
