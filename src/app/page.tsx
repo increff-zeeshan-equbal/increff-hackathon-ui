@@ -425,62 +425,29 @@ export default function HomePage() {
       setError(null);
       
       try {
-        // In a real implementation, we would make an API call here
-        // For now, simulate the API call with a timeout
-        setTimeout(() => {
-          // Mock API call - this would be replaced with an actual fetch call
-          // Example: const response = await fetch('/api/trace/' + traceId);
-          //          const data = await response.json();
-          
-          // For demonstration, we'll use the example data provided
-          const exampleResponse: TraceResponse = {
-            trace_id: "917df85e-e3ee-4481-8d4c-ea9b258c1f65",
-            count: 39,
-            summary: {
-              oms_count: 39,
-              cims_count: 0,
-              wms_count: 0
-            },
-            latestFailureCall: {
-              _id: "zQRUbpYB3rARF5bqxB4g",
-              _index: "oms-inbound-2025-04-25",
-              component: "oms",
-              application: "oms-inbound",
-              module: "ORDER_MANAGEMENT_SYSTEM",
-              client: "1200061523",
-              host: "staging-styli-omni",
-              timestamp: "2025-04-25T19:02:49.892",
-              url: "http://localhost:8080/oms/orders/outward/sub-orders/452?sync=false",
-              http_method: "GET",
-              http_status: "500",
-              status: "FAILURE",
-              duration_millis: 1084,
-              request_name: "GET_SUB_ORDER",
-              end_timestamp: "2025-04-25T19:02:50.976",
-              requestBody: "",
-              responseBody: "{\"code\":\"UNKNOWN_ERROR\",\"message\":\"Internal Error in OMS\",\"description\":null,\"errors\":[]}",
-              http_headers: ""
-            },
-            oms: Array(39).fill({
-              _id: "sample-id",
-              component: "oms",
-              application: "oms-application",
-              http_status: "200",
-              status: "SUCCESS",
-              url: "http://example.com"
-            }),
-            cims: [],
-            wms: []
-          };
-          
-          // Process the response
-          const processedSystems = processApiResponse(exampleResponse);
+        // Make real API call to the provided endpoint
+        const response = await fetch(`http://127.0.0.1:3005/api/trace?traceId=${traceId}`);
+        
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`);
+        }
+        
+        const data: TraceResponse = await response.json();
+        
+        // Check if all components have empty data
+        if (data.oms.length === 0 && data.cims.length === 0 && data.wms.length === 0) {
+          setError("No trace data found for the provided trace ID. Please verify the ID and try again.");
+          setSystemsData(null);
+        } else {
+          // Process the API response data
+          const processedSystems = processApiResponse(data);
           setSystemsData(processedSystems);
-          setIsLoading(false);
-        }, 1500);
+        }
       } catch (err) {
         console.error("Error fetching trace data:", err);
-        setError("Failed to fetch trace data. Please try again.");
+        setError(err instanceof Error ? err.message : "Failed to fetch trace data. Please try again.");
+        setSystemsData(null);
+      } finally {
         setIsLoading(false);
       }
     }
