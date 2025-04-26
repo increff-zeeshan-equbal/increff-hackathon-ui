@@ -35,13 +35,10 @@ import LinkIcon from '@mui/icons-material/Link';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
-import CircularProgress from '@mui/material/CircularProgress';
-import BugReportIcon from '@mui/icons-material/BugReport';
 import Autocomplete from '@mui/material/Autocomplete';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
@@ -54,8 +51,6 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ApiDashboard from '../components/ApiDashboard';
-import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
-import { ResponsiveContainer } from 'recharts';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const drawerWidth = 340;
@@ -198,20 +193,20 @@ const PromptChip = styled(Chip)(({ theme }) => ({
 }));
 
 const StatusBox = styled(Box)<{ status: string }>(({ theme, status }) => ({
-  width: '100%',
+  // width: '100%',
   minWidth: 180,
-  padding: theme.spacing(2.5),
-  borderRadius: theme.spacing(2),
-  background: 'rgba(18, 18, 30, 0.7)',
-  border: '1px solid',
+  // padding: theme.spacing(2.5),
+  // borderRadius: theme.spacing(2),
+  // background: 'rgba(18, 18, 30, 0.7)',
+  // border: '1px solid',
   borderColor:
     status === 'success' ? 'rgba(46, 204, 113, 0.3)' :
     status === 'failure' ? 'rgba(231, 76, 60, 0.3)' :
     'rgba(255, 255, 255, 0.08)',
-  boxShadow:
-    status === 'success' ? '0 4px 12px rgba(46, 204, 113, 0.15)' :
-    status === 'failure' ? '0 4px 12px rgba(231, 76, 60, 0.15)' :
-    '0 4px 12px rgba(0, 0, 0, 0.1)',
+  // boxShadow:
+  //   status === 'success' ? '0 4px 12px rgba(46, 204, 113, 0.15)' :
+  //   status === 'failure' ? '0 4px 12px rgba(231, 76, 60, 0.15)' :
+  //   '0 4px 12px rgba(0, 0, 0, 0.1)',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -328,6 +323,12 @@ const VerticalConnector = styled(ConnectorLine)(({ theme }) => ({
 
 // Custom hook for typing effect
 function useTypingEffect(text: string, speed: number = 50) {
+  // For "Hi, Avishek Chatterjee", return immediately without animation
+  if (text === 'Hi, Avishek Chatterjee') {
+    return { displayedText: text, isTyping: false };
+  }
+  
+  // For other text, use the normal typing animation
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(true);
   
